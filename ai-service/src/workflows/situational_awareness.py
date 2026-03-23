@@ -141,7 +141,9 @@ def geopolitical_analyst_agent(state: SituationalAwarenessState):
     """
     
     result = structured_llm.invoke(extraction_prompt)
-    
+    usage = getattr(result, "usage_metadata", None) or {}
+    tokens = usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
+
     events = [
         {
             "event_type": e.get("event_type", "unknown"),
@@ -153,8 +155,11 @@ def geopolitical_analyst_agent(state: SituationalAwarenessState):
         }
         for e in result.events
     ]
-    
-    return {"geopolitical_events": events}
+
+    return {
+        "geopolitical_events": events,
+        "token_usage": tokens,
+    }
 
 
 def infrastructure_correlator_agent(state: SituationalAwarenessState):
@@ -248,26 +253,35 @@ def threat_assessment_agent(state: SituationalAwarenessState):
     """
     
     assessment = structured_llm.invoke(context)
-    
+    usage = getattr(assessment, "usage_metadata", None) or {}
+    tokens = usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
+
     return {
         "threat_assessment": assessment.executive_summary,
-        "recommendations": assessment.recommended_actions
+        "threat_level": assessment.overall_threat_level,
+        "recommendations": assessment.recommended_actions,
+        "token_usage": tokens,
     }
+
+
+# Claude Sonnet pricing approximation: ~$9/1M tokens blended
+_COST_PER_TOKEN_USD = 9.0 / 1_000_000
 
 
 def output_formatter(state: SituationalAwarenessState):
     """NODE 5: Format results for frontend"""
+    token_usage = state.get("token_usage", 0)
     final_report = {
         "timestamp": str(datetime.datetime.now()),
-        "threat_level": state.get("threat_assessment", "unknown"),
+        "threat_level": state.get("threat_level", "unknown"),
         "total_articles": len(state["news_articles"]),
-        "geopolitical_events": len(state["geopolitical_events"]),
-        "infrastructure_at_risk": len(state["infrastructure_impacts"]),
+        "geopolitical_events": state["geopolitical_events"],
+        "infrastructure_at_risk": state["infrastructure_impacts"],
         "recommendations": state.get("recommendations", []),
-        "events": state["geopolitical_events"],
-        "correlations": state["infrastructure_impacts"]
+        "token_usage": token_usage,
+        "cost_usd": round(token_usage * _COST_PER_TOKEN_USD, 6),
     }
-    
+
     return {"final_report": json.dumps(final_report, indent=2)}
 
 
