@@ -35,7 +35,13 @@ class SocketHandler {
 
       logger.info('User connected', { socketId: socket.id });
 
+      const ALLOWED_CHANNELS = ['conflicts', 'energy', 'flights', 'news', 'threat-alerts'];
+
       socket.on('subscribe', (channel) => {
+        if (!ALLOWED_CHANNELS.includes(channel)) {
+          logger.warn('Subscribe rejected: unknown channel', { socketId: socket.id, channel });
+          return;
+        }
         socket.join(channel);
         logger.info('User subscribed', { socketId: socket.id, channel });
       });

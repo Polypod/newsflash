@@ -25,7 +25,9 @@ describe('WebSocket auth', () => {
     });
   });
 
-  afterAll(() => httpServer.close());
+  afterAll((done) => {
+    handler.io.close(done);
+  });
 
   it('disconnects client with no token', (done) => {
     const client = ioc(`http://localhost:${port}`, { auth: {} });
