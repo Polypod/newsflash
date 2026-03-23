@@ -1,8 +1,10 @@
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local   
-.env.development
 .env.test
 .env.production
+.gitnexus
+node_modules/
+logs/
+SKILL.md
+AGENTS.md
+CLAUDE.md
