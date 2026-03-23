@@ -75,6 +75,7 @@ services:
       ENVIRONMENT: development
       INTERNAL_API_KEY: ${AI_SERVICE_API_KEY:-changeme-internal-key}
       FRONTEND_URL: http://localhost:5173
+      TIINGO_API_KEY: ${TIINGO_API_KEY}
     ports:
       - "8000:8000"
     depends_on:

@@ -32,3 +32,9 @@ cost:
   # Blended cost per token in USD (~$9/1M tokens for Sonnet)
   cost_per_token_usd: 0.000009
   monthly_budget_usd: 5000
+
+tiingo:
+  # Max articles to fetch per Tiingo query
+  news_limit: 10
+  # Max tickers to send in a single request
+  max_tickers: 10

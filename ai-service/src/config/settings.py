@@ -78,6 +78,18 @@ class _Cost:
         return float(os.getenv("MONTHLY_BUDGET_USD") or get("cost", "monthly_budget_usd"))
 
 
+class _Tiingo:
+    @property
+    def news_limit(self) -> int:
+        return int(os.getenv("TIINGO_NEWS_LIMIT") or get("tiingo", "news_limit"))
+
+    @property
+    def max_tickers(self) -> int:
+        return int(os.getenv("TIINGO_MAX_TICKERS") or get("tiingo", "max_tickers"))
+
+
+tiingo = _Tiingo()
+
 models = _Models()
 workflow = _Workflow()
 cost = _Cost()
