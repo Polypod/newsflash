@@ -16,6 +16,23 @@ class SocketHandler {
 
   setupHandlers() {
     this.io.on('connection', (socket) => {
+      // Verify JWT token passed as handshake auth
+      const token = socket.handshake.auth?.token;
+      if (!token) {
+        logger.warn('Socket connection rejected: no token', { socketId: socket.id });
+        socket.disconnect(true);
+        return;
+      }
+
+      try {
+        const jwt = require('jsonwebtoken');
+        socket.user = jwt.verify(token, process.env.JWT_SECRET);
+      } catch {
+        logger.warn('Socket connection rejected: invalid token', { socketId: socket.id });
+        socket.disconnect(true);
+        return;
+      }
+
       logger.info('User connected', { socketId: socket.id });
 
       socket.on('subscribe', (channel) => {
