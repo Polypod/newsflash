@@ -14,7 +14,7 @@ import operator
 import json
 import datetime
 import os
-from config.settings import models as model_cfg, workflow as wf_cfg, cost as cost_cfg
+from config.settings import models as model_cfg, workflow as wf_cfg, cost as cost_cfg, tiingo as tiingo_cfg
 
 # ============= STATE SCHEMA =============
 
@@ -43,11 +43,22 @@ class InfrastructureCorrelation(TypedDict):
     correlation_score: float
     risk_assessment: str
 
+class FinancialNewsItem(TypedDict):
+    id: str
+    title: str
+    url: str
+    description: str
+    published_date: str
+    source: str
+    tickers: list[str]
+    tags: list[str]
+
 class SituationalAwarenessState(TypedDict):
     query: str
     news_articles: Annotated[list[NewsArticle], operator.add]
     geopolitical_events: Annotated[list[GeopoliticalEvent], operator.add]
     infrastructure_impacts: Annotated[list[InfrastructureCorrelation], operator.add]
+    financial_signals: Annotated[list[FinancialNewsItem], operator.add]
     threat_assessment: str
     threat_level: str                           # "low"|"medium"|"high"|"critical"
     token_usage: Annotated[int, operator.add]   # accumulated across agent nodes
@@ -223,6 +234,63 @@ def infrastructure_correlator_agent(state: SituationalAwarenessState):
                 })
 
     return {"infrastructure_impacts": correlations}
+
+
+def financial_news_agent(state: SituationalAwarenessState):
+    """NODE 4: LLM determines relevant tickers/tags from events → fetches Tiingo financial news"""
+    api_key = os.getenv("TIINGO_API_KEY")
+    if not api_key:
+        return {"financial_signals": []}
+
+    significant_events = [e for e in state["geopolitical_events"] if e.get("severity") != "low"]
+    if not significant_events:
+        return {"financial_signals": []}
+
+    # Ask LLM which financial instruments are affected by these events
+    llm = get_llm_extraction()
+
+    class TiingoQuery(BaseModel):
+        tickers: list[str] = Field(
+            description=(
+                "Stock tickers most likely affected by these events "
+                "(e.g. XOM, CVX for oil conflicts; TSM, NVDA for chip supply disruptions; "
+                "LMT, RTX, NOC for military conflicts). ETFs like XLE, IEF are fine. Max 10."
+            ),
+            default_factory=list,
+        )
+        tags: list[str] = Field(
+            description=(
+                "Tiingo news tags relevant to the events. "
+                "Choose from: energy, defense, technology, commodities, forex, "
+                "financials, healthcare, materials, real-estate, utilities. Max 5."
+            ),
+            default_factory=list,
+        )
+        rationale: str = Field(description="One sentence explaining the financial relevance.")
+
+    structured_llm = llm.with_structured_output(TiingoQuery)
+
+    events_text = "\n".join(
+        f"- [{e['severity'].upper()}] {e['event_type']}: {e['description'][:200]}"
+        for e in significant_events
+    )
+
+    query = structured_llm.invoke(
+        f"You are a financial analyst. Given these geopolitical events, identify "
+        f"the financial instruments most likely to be impacted.\n\nEVENTS:\n{events_text}"
+    )
+
+    # Fetch Tiingo news with LLM-determined parameters
+    from services.tiingo import fetch_tiingo_news
+
+    articles = fetch_tiingo_news(
+        tickers=query.tickers[: tiingo_cfg.max_tickers],
+        tags=query.tags[:5],
+        limit=tiingo_cfg.news_limit,
+        api_key=api_key,
+    )
+
+    return {"financial_signals": articles}
 
 
 def threat_assessment_agent(state: SituationalAwarenessState):
