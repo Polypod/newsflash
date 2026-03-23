@@ -159,28 +159,24 @@ def geopolitical_analyst_agent(state: SituationalAwarenessState):
 
 def infrastructure_correlator_agent(state: SituationalAwarenessState):
     """NODE 3: Find infrastructure within 200km of events"""
-    from sqlalchemy import create_engine, text
-    from sqlalchemy.orm import sessionmaker
-    
+    from config.database import get_db_pool
+
     correlations = []
-    
-    # Database connection
-    database_url = os.getenv("DATABASE_URL", "postgresql://appuser:devpassword@postgres:5432/conflicts_db")
-    engine = create_engine(database_url)
-    
     severity_multiplier = {
         "low": 0.3, "medium": 0.6, "high": 0.8, "critical": 1.0
     }
-    
+
+    db_pool = get_db_pool()
+
     for event in state["geopolitical_events"]:
         if event["severity"] == "low":
             continue
-        
-        query = text("""
+
+        sql = """
         WITH event_point AS (
-          SELECT ST_SetSRID(ST_GeomFromText(:location), 4326) as geom
+          SELECT ST_SetSRID(ST_GeomFromText(%s), 4326) as geom
         )
-        SELECT 
+        SELECT
           f.id,
           f.facility_type,
           ST_Distance(f.location::geography, ep.geom::geography) / 1000 as distance_km,
@@ -191,18 +187,22 @@ def infrastructure_correlator_agent(state: SituationalAwarenessState):
         WHERE ST_DWithin(f.location::geography, ep.geom::geography, 200000)
         ORDER BY distance_km ASC
         LIMIT 10
-        """)
-        
-        with engine.connect() as conn:
-            result = conn.execute(query, {"location": event["location"]})
-            rows = result.fetchall()
-        
+        """
+
+        conn = db_pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(sql, (event["location"],))
+                rows = cur.fetchall()
+        finally:
+            db_pool.putconn(conn)
+
         multiplier = severity_multiplier.get(event["severity"], 0.3)
-        
+
         for row in rows:
             facility_id, facility_type, distance_km, status, capacity = row
             correlation_score = max(0, 1.0 - (distance_km / 200)) * multiplier
-            
+
             if correlation_score > 0.3:
                 correlations.append({
                     "event_id": event.get("id", "unknown"),
@@ -214,7 +214,7 @@ def infrastructure_correlator_agent(state: SituationalAwarenessState):
                         f"at {distance_km:.1f}km from {facility_type}"
                     )
                 })
-    
+
     return {"infrastructure_impacts": correlations}
 
 
