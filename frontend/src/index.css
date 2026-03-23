@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-200: #bfdbfe;
+  --color-primary-300: #93c5fd;
+  --color-primary-400: #60a5fa;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a8a;
+
+  --color-threat-low: #22c55e;
+  --color-threat-medium: #f59e0b;
+  --color-threat-high: #ef4444;
+  --color-threat-critical: #7c2d12;
+
+  --color-conflict: #ef4444;
+  --color-energy: #f59e0b;
+  --color-flight: #3b82f6;
+  --color-correlation: #8b5cf6;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f9fafb;
+  color: #111827;
+}
+
+code {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Map container */
+.mapboxgl-map {
+  width: 100%;
+  height: 100%;
+}
+
+/* Chart containers */
+.recharts-wrapper {
+  width: 100% !important;
+}
+
+/* Loading spinner */
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Threat level indicators */
+.threat-low {
+  background-color: var(--color-threat-low);
+}
+
+.threat-medium {
+  background-color: var(--color-threat-medium);
+}
+
+.threat-high {
+  background-color: var(--color-threat-high);
+}
+
+.threat-critical {
+  background-color: var(--color-threat-critical);
+}
+
+/* Layer colors */
+.layer-conflict {
+  background-color: var(--color-conflict);
+}
+
+.layer-energy {
+  background-color: var(--color-energy);
+}
+
+.layer-flight {
+  background-color: var(--color-flight);
+}
+
+.layer-correlation {
+  background-color: var(--color-correlation);
+}
