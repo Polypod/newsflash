@@ -4,6 +4,7 @@ const { initializeDatabase } = require('./config/database');
 const { initializeRedis } = require('./config/redis');
 const SocketHandler = require('./websocket/socketHandler');
 const logger = require('./utils/logger');
+const { scheduleJobs } = require('./jobs/queues');
 
 const PORT = process.env.PORT || 3000;
 
@@ -23,6 +24,10 @@ async function startServer() {
     // Initialize WebSocket handler
     const socketHandler = new SocketHandler(server, redisClient);
     logger.info('WebSocket handler initialized');
+
+    // Start background job queues
+    scheduleJobs();
+    logger.info('Background job queues started');
 
     // Start server
     server.listen(PORT, () => {
