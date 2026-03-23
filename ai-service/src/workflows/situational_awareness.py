@@ -14,6 +14,7 @@ import operator
 import json
 import datetime
 import os
+from config.settings import models as model_cfg, workflow as wf_cfg, cost as cost_cfg
 
 # ============= STATE SCHEMA =============
 
@@ -56,27 +57,27 @@ class SituationalAwarenessState(TypedDict):
 # ============= INITIALIZE LLMs =============
 
 def get_llm_primary():
-    """Initialize primary LLM (Claude 3.5 Sonnet)"""
+    """Initialize primary LLM from settings.yaml"""
     return ChatAnthropic(
-        model="claude-3-5-sonnet-20241022",
-        temperature=0.3,
-        max_tokens=2000,
+        model=model_cfg.primary_model,
+        temperature=model_cfg.primary_temperature,
+        max_tokens=model_cfg.primary_max_tokens,
         anthropic_api_key=os.getenv("ANTHROPIC_API_KEY")
     )
 
 def get_llm_extraction():
-    """Initialize extraction LLM (GPT-4o-mini)"""
+    """Initialize extraction LLM from settings.yaml"""
     return ChatOpenAI(
-        model="gpt-4o-mini",
-        temperature=0.1,
-        max_tokens=1000,
+        model=model_cfg.extraction_model,
+        temperature=model_cfg.extraction_temperature,
+        max_tokens=model_cfg.extraction_max_tokens,
         openai_api_key=os.getenv("OPENAI_API_KEY")
     )
 
 def get_embeddings():
-    """Initialize embeddings model"""
+    """Initialize embeddings model from settings.yaml"""
     return OpenAIEmbeddings(
-        model="text-embedding-3-large",
+        model=model_cfg.embeddings_model,
         openai_api_key=os.getenv("OPENAI_API_KEY")
     )
 
@@ -92,7 +93,7 @@ def news_aggregation_agent(state: SituationalAwarenessState):
         persist_directory=os.getenv("CHROMA_DB_PATH", "./chroma_db")
     )
     
-    retriever = vectorstore.as_retriever(search_kwargs={"k": 20})
+    retriever = vectorstore.as_retriever(search_kwargs={"k": wf_cfg.news_retrieval_k})
     docs = retriever.invoke(state["query"])
     
     articles = []
@@ -189,15 +190,16 @@ def infrastructure_correlator_agent(state: SituationalAwarenessState):
           f.capacity
         FROM energy_facilities f
         CROSS JOIN event_point ep
-        WHERE ST_DWithin(f.location::geography, ep.geom::geography, 200000)
+        WHERE ST_DWithin(f.location::geography, ep.geom::geography, %s)
         ORDER BY distance_km ASC
         LIMIT 10
         """
 
+        radius_km = wf_cfg.infrastructure_radius_m // 1000
         conn = db_pool.getconn()
         try:
             with conn.cursor() as cur:
-                cur.execute(sql, (event["location"],))
+                cur.execute(sql, (event["location"], wf_cfg.infrastructure_radius_m))
                 rows = cur.fetchall()
         finally:
             db_pool.putconn(conn)
@@ -206,9 +208,9 @@ def infrastructure_correlator_agent(state: SituationalAwarenessState):
 
         for row in rows:
             facility_id, facility_type, distance_km, status, capacity = row
-            correlation_score = max(0, 1.0 - (distance_km / 200)) * multiplier
+            correlation_score = max(0, 1.0 - (distance_km / radius_km)) * multiplier
 
-            if correlation_score > 0.3:
+            if correlation_score > wf_cfg.correlation_threshold:
                 correlations.append({
                     "event_id": event.get("id", "unknown"),
                     "infrastructure_ids": [str(facility_id)],
@@ -264,8 +266,7 @@ def threat_assessment_agent(state: SituationalAwarenessState):
     }
 
 
-# Claude Sonnet pricing approximation: ~$9/1M tokens blended
-_COST_PER_TOKEN_USD = 9.0 / 1_000_000
+_COST_PER_TOKEN_USD = cost_cfg.cost_per_token_usd
 
 
 def output_formatter(state: SituationalAwarenessState):
@@ -333,9 +334,9 @@ async def analyze_situation(query: str) -> dict:
 # ============= COST OPTIMIZER =============
 
 class CostOptimizer:
-    def __init__(self, monthly_budget_usd: float = 5000):
-        self.monthly_budget = monthly_budget_usd
-        self.daily_limit = monthly_budget_usd / 30
+    def __init__(self, monthly_budget_usd: float = None):
+        self.monthly_budget = monthly_budget_usd or cost_cfg.monthly_budget_usd
+        self.daily_limit = self.monthly_budget / 30
     
     async def get_today_spend(self) -> float:
         """Get today's spending from database"""

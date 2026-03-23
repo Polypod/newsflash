@@ -23,12 +23,15 @@ const config = {
   // External APIs
   acledEmail: process.env.ACLED_EMAIL,
   acledPassword: process.env.ACLED_PASSWORD,
+  acledAccessToken: process.env.ACLED_ACCESS_TOKEN,           // preferred: OAuth2 bearer token
   eiaApiKey: process.env.EIA_API_KEY,
-  aviationstackApiKey: process.env.AVIATIONSTACK_API_KEY,
+  aviationstackApiKey: process.env.AVIATIONSTACK_API_KEY      // also accepts AVIATIONSTACK_API
+    || process.env.AVIATIONSTACK_API,
 
   // AI Services
   anthropicApiKey: process.env.ANTHROPIC_API_KEY,
-  openaiApiKey: process.env.OPENAI_API_KEY,
+  openaiApiKey: process.env.OPENAI_API_KEY                    // also accepts OPEN_API_KEY
+    || process.env.OPEN_API_KEY,
 
   // Mapbox
   mapboxToken: process.env.MAPBOX_TOKEN,

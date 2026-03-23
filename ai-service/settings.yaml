@@ -1,0 +1,34 @@
+# AI Service — Model & Workflow Configuration
+# All values can be overridden by environment variables (see below).
+
+models:
+  primary:
+    provider: anthropic
+    # Latest Claude Sonnet — fast, cost-effective for analysis tasks
+    model: claude-sonnet-4-6
+    temperature: 0.3
+    max_tokens: 2000
+
+  extraction:
+    provider: openai
+    # GPT-4o-mini for structured extraction — cheap and accurate
+    model: gpt-4o-mini
+    temperature: 0.1
+    max_tokens: 1000
+
+  embeddings:
+    provider: openai
+    model: text-embedding-3-large
+
+workflow:
+  # Number of articles to retrieve from Chroma per query
+  news_retrieval_k: 20
+  # Radius (km) to search for infrastructure around each event
+  infrastructure_radius_km: 200
+  # Minimum correlation score to include in results (0.0–1.0)
+  correlation_threshold: 0.3
+
+cost:
+  # Blended cost per token in USD (~$9/1M tokens for Sonnet)
+  cost_per_token_usd: 0.000009
+  monthly_budget_usd: 5000

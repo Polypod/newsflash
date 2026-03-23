@@ -4,7 +4,8 @@ const config = require('../config/env');
 
 class ACLEDService {
   constructor() {
-    this.baseUrl = 'https://api.acleddata.com/acled/read';
+    this.baseUrl = 'https://acleddata.com/api/acled/read';
+    this.accessToken = config.acledAccessToken;   // OAuth2 bearer token (preferred)
     this.email = config.acledEmail;
     this.password = config.acledPassword;
   }
@@ -12,13 +13,17 @@ class ACLEDService {
   async fetchConflicts(options = {}) {
     try {
       const { startDate, endDate, limit = 1000 } = options;
-      
-      const params = {
-        email: this.email,
-        password: this.password,
-        limit: limit,
-        format: 'json'
-      };
+
+      const params = { limit, format: 'json' };
+
+      // Prefer OAuth2 bearer token; fall back to legacy email+password query params
+      const headers = {};
+      if (this.accessToken) {
+        headers['Authorization'] = `Bearer ${this.accessToken}`;
+      } else {
+        params.email = this.email;
+        params.password = this.password;
+      }
 
       if (startDate) {
         params.event_date = startDate;
@@ -30,7 +35,7 @@ class ACLEDService {
         params.event_date_where = '<=';
       }
 
-      const response = await axios.get(this.baseUrl, { params });
+      const response = await axios.get(this.baseUrl, { params, headers });
       
       if (response.data.status === 200) {
         const conflicts = this.normalizeConflicts(response.data.data || []);
