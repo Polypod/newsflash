@@ -48,6 +48,8 @@ class SituationalAwarenessState(TypedDict):
     geopolitical_events: Annotated[list[GeopoliticalEvent], operator.add]
     infrastructure_impacts: Annotated[list[InfrastructureCorrelation], operator.add]
     threat_assessment: str
+    threat_level: str                           # "low"|"medium"|"high"|"critical"
+    token_usage: Annotated[int, operator.add]   # accumulated across agent nodes
     recommendations: list[str]
     final_report: str
 
@@ -303,12 +305,14 @@ async def analyze_situation(query: str) -> dict:
         "geopolitical_events": [],
         "infrastructure_impacts": [],
         "threat_assessment": "",
+        "threat_level": "",
+        "token_usage": 0,
         "recommendations": [],
         "final_report": ""
     }
-    
+
     graph = build_situational_awareness_workflow()
-    result = graph.invoke(initial_state)
+    result = await graph.ainvoke(initial_state)
     return json.loads(result["final_report"])
 
 
