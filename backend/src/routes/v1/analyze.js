@@ -40,7 +40,10 @@ router.post('/situation', async (req, res, next) => {
       include_infrastructure,
       threat_level_threshold
     }, {
-      timeout: 30000 // 30 second timeout
+      timeout: 30000,
+      headers: {
+        'X-Internal-Key': process.env.AI_SERVICE_API_KEY || ''
+      }
     });
 
     const result = response.data;
