@@ -29,3 +29,9 @@ sys.modules["langchain_anthropic"].ChatAnthropic = MagicMock()
 sys.modules["langchain_openai"].ChatOpenAI = MagicMock()
 sys.modules["langchain_openai"].OpenAIEmbeddings = MagicMock()
 sys.modules["langchain_chroma"].Chroma = MagicMock()
+
+# Conditionally stub httpx if not installed locally (it IS available in Docker)
+try:
+    import httpx  # noqa: F401
+except ImportError:
+    sys.modules["httpx"] = MagicMock()
