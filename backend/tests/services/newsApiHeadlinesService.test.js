@@ -29,7 +29,7 @@ describe('newsApiHeadlinesService.fetchTopHeadlines', () => {
     expect(results.length).toBe(3); // one per category (no overlap)
   });
 
-  it('deduplicates articles with the same URL', async () => {
+  it('deduplicates articles with the same external_id', async () => {
     const duplicate = makeArticle('http://same.com', 'Same');
     axios.get.mockResolvedValue({ data: { articles: [duplicate] } });
     const results = await newsApiHeadlinesService.fetchTopHeadlines();

@@ -16,10 +16,15 @@ CREATE TABLE IF NOT EXISTS news_articles (
   relevance_score NUMERIC(3, 2),
   threat_indicators TEXT[],
   url VARCHAR(500),
+  criticality_score INTEGER DEFAULT NULL,
+  criticality_reason TEXT DEFAULT NULL,
+  source_type VARCHAR(50) DEFAULT 'rss',
   created_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_news_published ON news_articles(published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_news_articles_headlines
+  ON news_articles (source_type, published_at DESC);
 
 -- Conflicts with geospatial indexing
 CREATE TABLE IF NOT EXISTS conflicts (
