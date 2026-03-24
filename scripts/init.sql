@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS news_articles (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_news_embedding ON news_articles USING ivfflat(embedding vector_cosine_ops);
+CREATE INDEX IF NOT EXISTS idx_news_embedding ON news_articles USING hnsw(embedding vector_cosine_ops);
 CREATE INDEX IF NOT EXISTS idx_news_published ON news_articles(published_at DESC);
 
 -- Conflicts with geospatial indexing
