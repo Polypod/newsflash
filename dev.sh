@@ -182,7 +182,9 @@ if ! (cd "$ROOT/ai-service" && uv pip install -q -r requirements.txt) \
 fi
 
 log "Starting ai-service..."
-(cd "$ROOT/ai-service" && PYTHONPATH=src .venv/bin/uvicorn src.main:app --reload --port 8000 --host 127.0.0.1) \
+# Sync INTERNAL_API_KEY with whatever AI_SERVICE_API_KEY the backend uses
+(cd "$ROOT/ai-service" && PYTHONPATH=src INTERNAL_API_KEY="${AI_SERVICE_API_KEY:-changeme-internal-key}" \
+  .venv/bin/uvicorn src.main:app --reload --port 8000 --host 127.0.0.1) \
   > "$LOGS_DIR/ai-service.log" 2>&1 &
 PIDS+=($!)
 ok "AI service started (pid $!, log: .dev-logs/ai-service.log)"

@@ -3,14 +3,13 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "postgis";
 CREATE EXTENSION IF NOT EXISTS "vector";
 
--- News articles with vector embeddings
+-- News articles — metadata only. Vector embeddings live in Chroma (ai-service).
 CREATE TABLE IF NOT EXISTS news_articles (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   source VARCHAR(100),
   external_id VARCHAR(500) UNIQUE,
   title VARCHAR(500),
   content TEXT,
-  embedding vector(3072),
   published_at TIMESTAMP,
   ingested_at TIMESTAMP DEFAULT NOW(),
   sentiment VARCHAR(20),
@@ -20,7 +19,6 @@ CREATE TABLE IF NOT EXISTS news_articles (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_news_embedding ON news_articles USING hnsw(embedding vector_cosine_ops);
 CREATE INDEX IF NOT EXISTS idx_news_published ON news_articles(published_at DESC);
 
 -- Conflicts with geospatial indexing

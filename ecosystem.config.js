@@ -37,6 +37,8 @@ module.exports = {
       env_production: {
         ENVIRONMENT: 'production',
         PYTHONPATH: `${APP_DIR}/ai-service/src`,
+        // Must match AI_SERVICE_API_KEY set in backend/.env
+        INTERNAL_API_KEY: process.env.AI_SERVICE_API_KEY || 'changeme-internal-key',
       },
       error_file: '/var/log/newsflash/ai-error.log',
       out_file: '/var/log/newsflash/ai-out.log',
