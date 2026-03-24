@@ -33,6 +33,7 @@ async function fetchTopHeadlines() {
           published_at: a.publishedAt ? new Date(a.publishedAt) : new Date(),
           category,
           author: a.author || 'Unknown',
+          source_type: 'newsapi-top',
         });
       }
     } catch (err) {
@@ -40,11 +41,11 @@ async function fetchTopHeadlines() {
     }
   }
 
-  // Deduplicate by URL
+  // Deduplicate by external_id (canonical identity key)
   const seen = new Set();
   return allArticles.filter((a) => {
-    if (seen.has(a.url)) return false;
-    seen.add(a.url);
+    if (seen.has(a.external_id)) return false;
+    seen.add(a.external_id);
     return true;
   });
 }

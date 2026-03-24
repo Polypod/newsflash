@@ -47,6 +47,7 @@ describe('newsApiHeadlinesService.fetchTopHeadlines', () => {
       url: 'http://b.com',
       category: expect.stringMatching(/general|business|technology/),
       author: 'John Doe',
+      source_type: 'newsapi-top',
     });
     expect(article.published_at).toBeInstanceOf(Date);
   });
