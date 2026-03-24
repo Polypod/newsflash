@@ -154,7 +154,7 @@ if [[ ! -d "$ROOT/backend/node_modules" ]]; then
 fi
 
 log "Starting backend..."
-(cd "$ROOT/backend" && npm run dev) > "$LOGS_DIR/backend.log" 2>&1 &
+(cd "$ROOT/backend" && PORT=3000 NODE_ENV=development npm run dev) > "$LOGS_DIR/backend.log" 2>&1 &
 PIDS+=($!)
 ok "Backend started (pid $!, log: .dev-logs/backend.log)"
 
