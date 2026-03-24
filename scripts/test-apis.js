@@ -197,6 +197,26 @@ async function testOpenAI() {
   } catch (e) { fail('OpenAI gpt-4o-mini', e.message); }
 }
 
+async function testTiingo() {
+  const key = process.env.TIINGO_API_KEY;
+  if (!key) return skip('Tiingo financial news', 'TIINGO_API_KEY not set');
+  try {
+    const url = `https://api.tiingo.com/tiingo/news?token=${key}&tickers=xom&limit=1`;
+    const res = await get(url, { 'Content-Type': 'application/json' });
+    const data = JSON.parse(res.body);
+    if (res.status === 200 && Array.isArray(data) && data.length > 0) {
+      const a = data[0];
+      pass('Tiingo financial news', `"${a.title?.slice(0, 50)}" (${a.source})`);
+    } else if (res.status === 401 || res.status === 403) {
+      fail('Tiingo financial news', 'invalid or expired API token');
+    } else if (res.status === 200 && Array.isArray(data) && data.length === 0) {
+      pass('Tiingo financial news', 'connected — no XOM articles at this moment');
+    } else {
+      fail('Tiingo financial news', `HTTP ${res.status}: ${res.body.slice(0, 120)}`);
+    }
+  } catch (e) { fail('Tiingo financial news', e.message); }
+}
+
 // ── Run all ───────────────────────────────────────────────────────────────────
 
 (async () => {
@@ -206,6 +226,7 @@ async function testOpenAI() {
   await testACLED();
   await testAnthropic();
   await testOpenAI();
+  await testTiingo();
 
   const passed = results.filter(r => r.status === 'pass').length;
   const failed = results.filter(r => r.status === 'fail').length;
