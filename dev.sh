@@ -135,6 +135,13 @@ for i in $(seq 1 45); do
   sleep 2
 done
 
+log "Applying database schema..."
+docker compose "${COMPOSE_ARGS[@]}" exec -T postgres \
+  psql -U appuser -d conflicts_db \
+  -f /docker-entrypoint-initdb.d/init.sql \
+  --quiet 2>&1 | grep -v "^$" || true
+ok "Schema ready."
+
 log "Waiting for redis..."
 for i in $(seq 1 15); do
   if docker compose "${COMPOSE_ARGS[@]}" exec -T redis redis-cli ping &>/dev/null; then
