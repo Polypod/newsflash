@@ -1,6 +1,6 @@
 """
 Situational Awareness Workflow - LangGraph Implementation
-Four Parallel AI Agents for Geopolitical Analysis
+Six-node sequential LangGraph workflow for geopolitical situational awareness analysis.
 """
 
 from typing import Annotated, TypedDict, Literal, List, Dict, Any
@@ -294,7 +294,7 @@ def financial_news_agent(state: SituationalAwarenessState):
 
 
 def threat_assessment_agent(state: SituationalAwarenessState):
-    """NODE 4: Synthesize all data into threat assessment"""
+    """NODE 5: Synthesize all data into threat assessment"""
     llm = get_llm_primary()
     
     class ThreatAssessment(BaseModel):

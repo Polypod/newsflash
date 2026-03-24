@@ -48,7 +48,7 @@ def test_fetch_passes_correct_query_params():
         MockClient.return_value.__enter__.return_value = mock_client
         fetch_tiingo_news(tickers=["XOM", "BP"], tags=["energy"], limit=7, api_key="my-key")
 
-    call_kwargs = mock_client.get.call_args[1]
+    call_kwargs = mock_client.get.call_args.kwargs
     params = call_kwargs["params"]
     assert params["token"] == "my-key"
     assert params["tickers"] == "XOM,BP"
@@ -74,6 +74,6 @@ def test_fetch_omits_empty_tickers_and_tags():
         MockClient.return_value.__enter__.return_value = mock_client
         fetch_tiingo_news(tickers=[], tags=[], limit=5, api_key="key")
 
-    params = mock_client.get.call_args[1]["params"]
+    params = mock_client.get.call_args.kwargs["params"]
     assert "tickers" not in params
     assert "tags" not in params
