@@ -2,10 +2,15 @@
 # dev.sh — Start all services for local development
 # Usage: ./dev.sh [--no-frontend] [--infra-only]
 #
-# NOTE: vite.config.js proxies /api and /ws to :3001, but the backend
-# .env.example sets PORT=3000. If the frontend can't reach the API,
-# either change vite.config.js target to :3000 or set PORT=3001 in
-# backend/.env.
+# Run with bash (not sh):  bash dev.sh  or  chmod +x dev.sh && ./dev.sh
+#
+# Env files (in priority order):
+#   1. .env.local  (root) — put API keys here; gitignored
+#   2. <svc>/.env.local   — per-service overrides
+#   3. <svc>/.env         — auto-copied from .env.example if missing
+#
+# NOTE: vite.config.js proxies /api and /ws to :3001, but backend
+# .env.example sets PORT=3000. Align one or the other before running.
 
 set -euo pipefail
 
@@ -26,26 +31,42 @@ done
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
 
-log()  { echo -e "${BOLD}[dev]${RESET} $*"; }
-ok()   { echo -e "${GREEN}[dev]${RESET} $*"; }
-warn() { echo -e "${YELLOW}[dev]${RESET} $*"; }
-err()  { echo -e "${RED}[dev]${RESET} $*" >&2; }
+log()  { printf "${BOLD}[dev]${RESET} %s\n" "$*"; }
+ok()   { printf "${GREEN}[dev]${RESET} %s\n" "$*"; }
+warn() { printf "${YELLOW}[dev]${RESET} %s\n" "$*"; }
+err()  { printf "${RED}[dev]${RESET} %s\n" "$*" >&2; }
 
 # ── Prerequisites ──────────────────────────────────────────────────────────────
-check_cmd() {
-  command -v "$1" &>/dev/null || { err "Required: $1 not found"; exit 1; }
-}
+check_cmd() { command -v "$1" &>/dev/null || { err "Required: $1 not found"; exit 1; }; }
 check_cmd docker
 check_cmd node
 check_cmd python3
 
 mkdir -p "$LOGS_DIR"
 
-# ── .env setup ─────────────────────────────────────────────────────────────────
+# ── Load root .env.local (API keys etc.) ──────────────────────────────────────
+ROOT_ENV_FILE=""
+if [[ -f "$ROOT/.env.local" ]]; then
+  ROOT_ENV_FILE="$ROOT/.env.local"
+  log "Loading root .env.local"
+  set -a; source "$ROOT_ENV_FILE"; set +a
+elif [[ -f "$ROOT/.env" ]]; then
+  ROOT_ENV_FILE="$ROOT/.env"
+  warn "No .env.local found — using root .env"
+  set -a; source "$ROOT_ENV_FILE"; set +a
+else
+  warn "No root .env.local or .env — API keys may be missing (create .env.local)"
+fi
+
+# ── Per-service .env setup ─────────────────────────────────────────────────────
+# Services load their own .env (connection strings, local config).
+# API keys already exported above will take precedence over .env values.
 for svc in backend ai-service frontend; do
-  if [[ ! -f "$ROOT/$svc/.env" ]]; then
+  if [[ -f "$ROOT/$svc/.env.local" ]]; then
+    : # already handled by the service's own dotenv or inherited from env
+  elif [[ ! -f "$ROOT/$svc/.env" ]]; then
     if [[ -f "$ROOT/$svc/.env.example" ]]; then
-      warn "$svc/.env missing — copying from .env.example (fill in API keys!)"
+      warn "$svc/.env missing — copying from .env.example"
       cp "$ROOT/$svc/.env.example" "$ROOT/$svc/.env"
     else
       warn "$svc/.env missing and no .env.example found"
@@ -55,38 +76,44 @@ done
 
 # ── Cleanup ────────────────────────────────────────────────────────────────────
 cleanup() {
-  echo ""
+  printf "\n"
   log "Shutting down services..."
-  for pid in "${PIDS[@]}"; do
-    kill "$pid" 2>/dev/null || true
-  done
-  # Stop infra containers
+  if [[ ${#PIDS[@]} -gt 0 ]]; then
+    kill "${PIDS[@]}" 2>/dev/null || true
+  fi
   docker compose -f "$ROOT/docker-compose.yml" stop postgres redis 2>/dev/null || true
   ok "All services stopped."
 }
 trap cleanup EXIT INT TERM
 
 # ── Infrastructure (Postgres + Redis) ─────────────────────────────────────────
+COMPOSE_ARGS=(-f "$ROOT/docker-compose.yml")
+[[ -n "$ROOT_ENV_FILE" ]] && COMPOSE_ARGS+=(--env-file "$ROOT_ENV_FILE")
+
 log "Starting infrastructure (postgres, redis)..."
-docker compose -f "$ROOT/docker-compose.yml" up -d postgres redis
+docker compose "${COMPOSE_ARGS[@]}" up -d postgres redis
 
-log "Waiting for postgres to be healthy..."
-for i in $(seq 1 30); do
-  docker compose -f "$ROOT/docker-compose.yml" exec -T postgres \
-    pg_isready -U appuser -d conflicts_db &>/dev/null && break
-  [[ $i -eq 30 ]] && { err "Postgres did not become healthy in time"; exit 1; }
-  sleep 1
+# Postgres can take 60-90s on first start (PostGIS + pgvector extension init)
+log "Waiting for postgres (up to 90s on first run)..."
+for i in $(seq 1 45); do
+  if docker compose "${COMPOSE_ARGS[@]}" exec -T postgres \
+      pg_isready -U appuser -d conflicts_db &>/dev/null; then
+    ok "Postgres ready (${i}x2s)."
+    break
+  fi
+  [[ $i -eq 45 ]] && { err "Postgres did not become healthy in time"; exit 1; }
+  sleep 2
 done
-ok "Postgres ready."
 
-log "Waiting for redis to be healthy..."
+log "Waiting for redis..."
 for i in $(seq 1 15); do
-  docker compose -f "$ROOT/docker-compose.yml" exec -T redis \
-    redis-cli ping &>/dev/null && break
+  if docker compose "${COMPOSE_ARGS[@]}" exec -T redis redis-cli ping &>/dev/null; then
+    ok "Redis ready."
+    break
+  fi
   [[ $i -eq 15 ]] && { err "Redis did not become healthy in time"; exit 1; }
   sleep 1
 done
-ok "Redis ready."
 
 [[ $INFRA_ONLY == true ]] && { ok "Infra only mode — done."; exit 0; }
 
@@ -131,24 +158,20 @@ if [[ $NO_FRONTEND == false ]]; then
 fi
 
 # ── Summary ────────────────────────────────────────────────────────────────────
-echo ""
-echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
-echo -e "${CYAN}  Frontend   ${RESET}http://localhost:5173"
-echo -e "${CYAN}  Backend    ${RESET}http://localhost:3000  (API docs: /api-docs)"
-echo -e "${CYAN}  AI Service ${RESET}http://localhost:8000  (docs: /docs)"
-echo -e "${CYAN}  Postgres   ${RESET}localhost:5432"
-echo -e "${CYAN}  Redis      ${RESET}localhost:6379"
-echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
-echo ""
-echo "Logs: .dev-logs/   |   Press Ctrl+C to stop all services"
-echo ""
+printf "\n"
+printf "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}\n"
+printf "${CYAN}  Frontend   ${RESET}http://localhost:5173\n"
+printf "${CYAN}  Backend    ${RESET}http://localhost:3000  (API docs: /api-docs)\n"
+printf "${CYAN}  AI Service ${RESET}http://localhost:8000  (docs: /docs)\n"
+printf "${CYAN}  Postgres   ${RESET}localhost:5432\n"
+printf "${CYAN}  Redis      ${RESET}localhost:6379\n"
+printf "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}\n"
+printf "\nLogs: .dev-logs/   |   Press Ctrl+C to stop all services\n\n"
 
 # Tail all logs combined
-tail -n 0 -F \
-  "$LOGS_DIR/backend.log" \
-  "$LOGS_DIR/ai-service.log" \
-  ${NO_FRONTEND:-"$LOGS_DIR/frontend.log"} \
-  2>/dev/null &
+TAIL_LOGS=("$LOGS_DIR/backend.log" "$LOGS_DIR/ai-service.log")
+[[ $NO_FRONTEND == false ]] && TAIL_LOGS+=("$LOGS_DIR/frontend.log")
+tail -n 0 -F "${TAIL_LOGS[@]}" 2>/dev/null &
 PIDS+=($!)
 
 wait
