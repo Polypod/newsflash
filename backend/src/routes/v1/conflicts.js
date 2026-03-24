@@ -3,6 +3,7 @@ const router = express.Router();
 const { getDbPool } = require('../../config/database');
 const { getRedisClient } = require('../../config/redis');
 const logger = require('../../utils/logger');
+const acledService = require('../../services/acledService');
 
 // GET /api/v1/conflicts
 router.get('/', async (req, res, next) => {
@@ -72,6 +73,63 @@ router.get('/', async (req, res, next) => {
     res.json(response);
   } catch (error) {
     logger.error('Error fetching conflicts:', error);
+    next(error);
+  }
+});
+
+// GET /api/v1/conflicts/cast
+// Live CAST forecasts from ACLED (6 rolling 4-week periods ahead per country).
+// Query params: region (slug or code), countries (comma-separated), year, month
+router.get('/cast', async (req, res, next) => {
+  try {
+    const { region, countries, year, month } = req.query;
+    const redisClient = getRedisClient();
+    const cacheKey = `conflicts:cast:${region || 'all'}:${countries || 'all'}:${year || 'all'}:${month || 'all'}`;
+
+    const cached = await redisClient.get(cacheKey);
+    if (cached) return res.json(JSON.parse(cached));
+
+    const forecasts = await acledService.fetchCAST({
+      region,
+      countries: countries ? countries.split(',').map(c => c.trim()) : undefined,
+      year:  year  ? parseInt(year)  : undefined,
+      month: month ? parseInt(month) : undefined,
+    });
+
+    const response = { data: forecasts, meta: { total: forecasts.length } };
+    await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
+    res.json(response);
+  } catch (error) {
+    logger.error('Error fetching CAST forecasts', { error: error.message });
+    next(error);
+  }
+});
+
+// GET /api/v1/conflicts/aggregated
+// Weekly aggregated event/fatality counts from ACLED.
+// Query params: region, countries, startDate, endDate, limit
+router.get('/aggregated', async (req, res, next) => {
+  try {
+    const { region, countries, startDate, endDate, limit } = req.query;
+    const redisClient = getRedisClient();
+    const cacheKey = `conflicts:agg:${region || 'all'}:${countries || 'all'}:${startDate || 'all'}:${endDate || 'all'}`;
+
+    const cached = await redisClient.get(cacheKey);
+    if (cached) return res.json(JSON.parse(cached));
+
+    const records = await acledService.fetchAggregated({
+      region,
+      countries: countries ? countries.split(',').map(c => c.trim()) : undefined,
+      startDate,
+      endDate,
+      limit: limit ? parseInt(limit) : undefined,
+    });
+
+    const response = { data: records, meta: { total: records.length } };
+    await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
+    res.json(response);
+  } catch (error) {
+    logger.error('Error fetching aggregated conflicts', { error: error.message });
     next(error);
   }
 });

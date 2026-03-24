@@ -182,19 +182,9 @@ if ! (cd "$ROOT/ai-service" && uv pip install -q -r requirements.txt) \
 fi
 
 log "Starting ai-service..."
-# Forward AI_SERVICE_API_KEY → INTERNAL_API_KEY only when it is explicitly set.
-# If unset, let ai-service load INTERNAL_API_KEY from its own .env (avoids
-# overriding the correct value with the changeme fallback).
-if [[ -n "${AI_SERVICE_API_KEY:-}" ]]; then
-  (cd "$ROOT/ai-service" && PYTHONPATH=src INTERNAL_API_KEY="$AI_SERVICE_API_KEY" \
-    .venv/bin/uvicorn src.main:app --reload --port 8000 --host 127.0.0.1) \
-    > "$LOGS_DIR/ai-service.log" 2>&1 &
-else
-  warn "AI_SERVICE_API_KEY not in env — ai-service uses INTERNAL_API_KEY from ai-service/.env (must match backend AI_SERVICE_API_KEY)"
-  (cd "$ROOT/ai-service" && PYTHONPATH=src \
-    .venv/bin/uvicorn src.main:app --reload --port 8000 --host 127.0.0.1) \
-    > "$LOGS_DIR/ai-service.log" 2>&1 &
-fi
+(cd "$ROOT/ai-service" && PYTHONPATH=src \
+  .venv/bin/uvicorn src.main:app --reload --port 8000 --host 127.0.0.1) \
+  > "$LOGS_DIR/ai-service.log" 2>&1 &
 PIDS+=($!)
 ok "AI service started (pid $!, log: .dev-logs/ai-service.log)"
 

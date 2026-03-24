@@ -42,7 +42,7 @@ router.post('/situation', async (req, res, next) => {
     }, {
       timeout: 30000,
       headers: {
-        'X-Internal-Key': process.env.AI_SERVICE_API_KEY || ''
+        'X-Internal-Key': process.env.INTERNAL_API_KEY || ''
       }
     });
 
