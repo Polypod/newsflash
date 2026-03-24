@@ -7,6 +7,7 @@ const initialState = {
   flights: [],
   correlations: [],
   newsArticles: [],
+  castForecasts: [],
   analysis: null,
   threatLevel: 'low',
   isLoading: false,
@@ -23,6 +24,7 @@ const ActionTypes = {
   SET_FLIGHTS: 'SET_FLIGHTS',
   SET_CORRELATIONS: 'SET_CORRELATIONS',
   SET_NEWS_ARTICLES: 'SET_NEWS_ARTICLES',
+  SET_CAST_FORECASTS: 'SET_CAST_FORECASTS',
   SET_ANALYSIS: 'SET_ANALYSIS',
   SET_THREAT_LEVEL: 'SET_THREAT_LEVEL',
   UPDATE_CONFLICT: 'UPDATE_CONFLICT',
@@ -55,6 +57,9 @@ function dataReducer(state, action) {
 
     case ActionTypes.SET_NEWS_ARTICLES:
       return { ...state, newsArticles: action.payload, lastUpdate: new Date().toISOString() };
+
+    case ActionTypes.SET_CAST_FORECASTS:
+      return { ...state, castForecasts: action.payload, lastUpdate: new Date().toISOString() };
 
     case ActionTypes.SET_ANALYSIS:
       return { ...state, analysis: action.payload, lastUpdate: new Date().toISOString() };
@@ -140,6 +145,10 @@ export function DataProvider({ children }) {
     dispatch({ type: ActionTypes.SET_NEWS_ARTICLES, payload: articles });
   }, []);
 
+  const setCastForecasts = useCallback((forecasts) => {
+    dispatch({ type: ActionTypes.SET_CAST_FORECASTS, payload: forecasts });
+  }, []);
+
   const setAnalysis = useCallback((analysis) => {
     dispatch({ type: ActionTypes.SET_ANALYSIS, payload: analysis });
   }, []);
@@ -177,6 +186,7 @@ export function DataProvider({ children }) {
     setFlights,
     setCorrelations,
     setNewsArticles,
+    setCastForecasts,
     setAnalysis,
     setThreatLevel,
     updateConflict,

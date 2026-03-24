@@ -53,11 +53,23 @@ class FinancialNewsItem(TypedDict):
     tickers: list[str]
     tags: list[str]
 
+class CastForecast(TypedDict):
+    country: str
+    admin1: str
+    year: int
+    month: int
+    period_label: str          # e.g. "Apr 2026"
+    total_forecast: float
+    battles_forecast: float
+    erv_forecast: float        # Explosions / Remote violence
+    vac_forecast: float        # Violence against civilians
+
 class SituationalAwarenessState(TypedDict):
     query: str
     news_articles: Annotated[list[NewsArticle], operator.add]
     geopolitical_events: Annotated[list[GeopoliticalEvent], operator.add]
     infrastructure_impacts: Annotated[list[InfrastructureCorrelation], operator.add]
+    cast_forecasts: Annotated[list[CastForecast], operator.add]
     financial_signals: Annotated[list[FinancialNewsItem], operator.add]
     threat_assessment: str
     threat_level: str                           # "low"|"medium"|"high"|"critical"
@@ -236,6 +248,105 @@ def infrastructure_correlator_agent(state: SituationalAwarenessState):
     return {"infrastructure_impacts": correlations}
 
 
+def cast_forecast_agent(state: SituationalAwarenessState):
+    """NODE 4: Fetch ACLED CAST rolling forecasts for countries in current events.
+
+    CAST provides 6 rolling 4-week period predictions per country (total events,
+    battles, explosions/remote violence, violence against civilians). We query
+    the cast_forecasts table for countries appearing in the geopolitical events
+    and return upcoming periods, ordered nearest-first.
+    """
+    from config.database import get_db_pool
+
+    if not state.get("geopolitical_events"):
+        return {"cast_forecasts": []}
+
+    # Extract candidate country strings from event locations and actors.
+    # Location strings: "Khartoum, Sudan" → "Sudan"; "Middle East" → kept as-is.
+    # Actors: "Government of Sudan" → "Sudan"; "Hamas" → kept (no country match needed).
+    country_candidates: set[str] = set()
+    for event in state["geopolitical_events"]:
+        loc = event.get("location", "")
+        if loc:
+            parts = [p.strip() for p in loc.split(",")]
+            # Last part is most likely the country
+            country_candidates.add(parts[-1])
+            if len(parts) > 1:
+                country_candidates.add(parts[0])
+        for actor in event.get("actors", []):
+            # "Government of X" / "X Military" / "X Army" patterns
+            for prefix in ("Government of ", "Republic of ", "State of "):
+                if actor.startswith(prefix):
+                    country_candidates.add(actor[len(prefix):].strip())
+
+    country_candidates.discard("")
+
+    db_pool = get_db_pool()
+    now = datetime.datetime.now()
+
+    # Query upcoming CAST periods for matched countries, plus top-5 globally
+    # for broader threat context (helps the LLM see the global picture).
+    conn = db_pool.getconn()
+    try:
+        with conn.cursor() as cur:
+            if country_candidates:
+                cur.execute("""
+                    SELECT country, admin1, year, month,
+                           total_forecast, battles_forecast, erv_forecast, vac_forecast
+                    FROM cast_forecasts
+                    WHERE country = ANY(%s)
+                      AND (year > %s OR (year = %s AND month >= %s))
+                    ORDER BY country, year, month
+                    LIMIT 120
+                """, (list(country_candidates), now.year, now.year, now.month))
+                matched = cur.fetchall()
+            else:
+                matched = []
+
+            # Top-5 highest-forecast countries globally for the nearest period
+            cur.execute("""
+                SELECT DISTINCT ON (country) country, admin1, year, month,
+                       total_forecast, battles_forecast, erv_forecast, vac_forecast
+                FROM cast_forecasts
+                WHERE admin1 IS NULL
+                  AND (year > %s OR (year = %s AND month >= %s))
+                ORDER BY country, year, month, total_forecast DESC
+                LIMIT 5
+            """, (now.year, now.year, now.month))
+            top_global = cur.fetchall()
+    finally:
+        db_pool.putconn(conn)
+
+    seen = set()
+    forecasts = []
+    for rows in (matched, top_global):
+        for row in rows:
+            country, admin1, year, month, total, battles, erv, vac = row
+            key = (country, admin1, year, month)
+            if key in seen:
+                continue
+            seen.add(key)
+            forecasts.append({
+                "country": country,
+                "admin1": admin1,
+                "year": year,
+                "month": month,
+                "period_label": datetime.date(year, month, 1).strftime("%b %Y"),
+                "total_forecast": float(total or 0),
+                "battles_forecast": float(battles or 0),
+                "erv_forecast": float(erv or 0),
+                "vac_forecast": float(vac or 0),
+            })
+
+    forecasts.sort(key=lambda f: (f["country"], f["year"], f["month"]))
+    logger.info(f"CAST: {len(forecasts)} forecast records for {len(country_candidates)} candidate countries")
+    return {"cast_forecasts": forecasts}
+
+
+import logging
+logger = logging.getLogger(__name__)
+
+
 def financial_news_agent(state: SituationalAwarenessState):
     """NODE 4: LLM determines relevant tickers/tags from events → fetches Tiingo financial news"""
     api_key = os.getenv("TIINGO_API_KEY")
@@ -306,12 +417,34 @@ def threat_assessment_agent(state: SituationalAwarenessState):
     
     structured_llm = llm.with_structured_output(ThreatAssessment)
     
+    # Summarise CAST: per country, show period_label + total_forecast (sorted by forecast desc)
+    cast_summary = {}
+    for f in state.get("cast_forecasts", []):
+        c = f["country"]
+        cast_summary.setdefault(c, []).append(f)
+    cast_context = {
+        country: [
+            {"period": f["period_label"], "total": f["total_forecast"],
+             "battles": f["battles_forecast"], "erv": f["erv_forecast"],
+             "vac": f["vac_forecast"]}
+            for f in sorted(periods, key=lambda x: (x["year"], x["month"]))
+        ]
+        for country, periods in cast_summary.items()
+    }
+
     context = f"""
     GEOPOLITICAL SITUATION REPORT
 
     EVENTS: {json.dumps(state['geopolitical_events'], indent=2)}
 
     INFRASTRUCTURE AT RISK: {json.dumps(state['infrastructure_impacts'], indent=2)}
+
+    ACLED CAST FORECASTS — rolling 4-week political violence predictions (next 6 periods):
+    {json.dumps(cast_context, indent=2) if cast_context else "No CAST data available (DB may need initial sync)."}
+    Interpret: higher total_forecast = more predicted violence events. Battles, ERV (explosions/remote
+    violence), VAC (violence against civilians) are the sub-categories. Use these as forward-looking
+    risk multipliers — a country with rising forecasts warrants elevated concern even if current
+    events appear stable.
 
     FINANCIAL SIGNALS: {json.dumps([{
         'title': f['title'],
@@ -326,7 +459,9 @@ def threat_assessment_agent(state: SituationalAwarenessState):
         'relevance': a['relevance_score']
     } for a in state['news_articles'][:5]], indent=2)}
 
-    Generate a concise threat assessment for decision-makers, incorporating financial market signals where relevant.
+    Generate a concise threat assessment for decision-makers. Incorporate CAST forecasts as
+    forward-looking evidence — if forecasts indicate escalation in affected regions, reflect
+    that in the threat level and recommendations.
     """
     
     assessment = structured_llm.invoke(context)
@@ -354,6 +489,7 @@ def output_formatter(state: SituationalAwarenessState):
         "total_articles": len(state["news_articles"]),
         "geopolitical_events": state["geopolitical_events"],
         "infrastructure_at_risk": state["infrastructure_impacts"],
+        "cast_forecasts": state.get("cast_forecasts", []),
         "financial_signals": financial_signals,
         "recommendations": state.get("recommendations", []),
         "token_usage": token_usage,
@@ -373,16 +509,19 @@ def build_situational_awareness_workflow():
     workflow.add_node("news_aggregation", news_aggregation_agent)
     workflow.add_node("geopolitical_analyst", geopolitical_analyst_agent)
     workflow.add_node("infrastructure_correlator", infrastructure_correlator_agent)
-    workflow.add_node("financial_news", financial_news_agent)          # NEW
+    workflow.add_node("cast_forecast", cast_forecast_agent)
+    workflow.add_node("financial_news", financial_news_agent)
     workflow.add_node("threat_assessment", threat_assessment_agent)
     workflow.add_node("output_formatter", output_formatter)
 
-    # Define edges
+    # Sequential pipeline:
+    # news → events → infrastructure → CAST forecasts → financial → assessment → output
     workflow.add_edge(START, "news_aggregation")
     workflow.add_edge("news_aggregation", "geopolitical_analyst")
     workflow.add_edge("geopolitical_analyst", "infrastructure_correlator")
-    workflow.add_edge("infrastructure_correlator", "financial_news")   # NEW
-    workflow.add_edge("financial_news", "threat_assessment")           # CHANGED
+    workflow.add_edge("infrastructure_correlator", "cast_forecast")
+    workflow.add_edge("cast_forecast", "financial_news")
+    workflow.add_edge("financial_news", "threat_assessment")
     workflow.add_edge("threat_assessment", "output_formatter")
     workflow.add_edge("output_formatter", END)
 
@@ -398,6 +537,7 @@ async def analyze_situation(query: str) -> dict:
         "news_articles": [],
         "geopolitical_events": [],
         "infrastructure_impacts": [],
+        "cast_forecasts": [],
         "financial_signals": [],
         "threat_assessment": "",
         "threat_level": "",

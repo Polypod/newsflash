@@ -83,6 +83,26 @@ CREATE TABLE IF NOT EXISTS analysis_cache (
   expires_at TIMESTAMP DEFAULT NOW() + INTERVAL '24 hours'
 );
 
+-- CAST conflict forecasts (ACLED Conflict Alert System)
+-- Rolling 4-week period forecasts; 6 periods ahead per country/admin1.
+-- Updated weekly by the cast-sync background job.
+CREATE TABLE IF NOT EXISTS cast_forecasts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  country VARCHAR(100) NOT NULL,
+  admin1 VARCHAR(100),
+  year INT NOT NULL,
+  month INT NOT NULL,
+  total_forecast NUMERIC(10, 2),
+  battles_forecast NUMERIC(10, 2),
+  erv_forecast NUMERIC(10, 2),   -- Explosions/Remote violence
+  vac_forecast NUMERIC(10, 2),   -- Violence against civilians
+  fetched_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE (country, COALESCE(admin1, ''), year, month)
+);
+
+CREATE INDEX IF NOT EXISTS idx_cast_country ON cast_forecasts(country);
+CREATE INDEX IF NOT EXISTS idx_cast_period ON cast_forecasts(year, month DESC);
+
 -- Create a function to clean up old flights
 CREATE OR REPLACE FUNCTION cleanup_old_flights()
 RETURNS void AS $$

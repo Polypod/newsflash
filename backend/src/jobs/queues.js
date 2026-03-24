@@ -13,9 +13,10 @@ const redisConfig = {
 
 // Create queues
 const conflictQueue = new Queue('acled-conflicts', redisConfig);
-const energyQueue = new Queue('eia-energy', redisConfig);
-const flightQueue = new Queue('aviation-flights', redisConfig);
-const newsQueue = new Queue('news-ingestion', redisConfig);
+const castQueue     = new Queue('acled-cast', redisConfig);
+const energyQueue   = new Queue('eia-energy', redisConfig);
+const flightQueue   = new Queue('aviation-flights', redisConfig);
+const newsQueue     = new Queue('news-ingestion', redisConfig);
 const analysisQueue = new Queue('ai-analysis', redisConfig);
 
 // Queue event handlers
@@ -39,6 +40,7 @@ const setupQueueEvents = (queue, queueName) => {
 
 // Setup event handlers for all queues
 setupQueueEvents(conflictQueue, 'acled-conflicts');
+setupQueueEvents(castQueue, 'acled-cast');
 setupQueueEvents(energyQueue, 'eia-energy');
 setupQueueEvents(flightQueue, 'aviation-flights');
 setupQueueEvents(newsQueue, 'news-ingestion');
@@ -61,6 +63,56 @@ conflictQueue.process(async (job) => {
   logger.info(`Conflict sync complete: ${conflicts.length} conflicts fetched`);
   
   return { processed: conflicts.length, timestamp: new Date().toISOString() };
+});
+
+// CAST sync: fetch all-country forecasts from ACLED and upsert into cast_forecasts table.
+// ACLED updates CAST weekly; we mirror that schedule.
+castQueue.process(async (job) => {
+  const acledService = require('../services/acledService');
+  const { getDbPool } = require('../config/database');
+  const { region } = job.data;
+
+  logger.info('Processing CAST sync job', { region: region || 'global' });
+
+  const forecasts = await acledService.fetchCAST({ region });
+
+  if (!forecasts.length) {
+    logger.warn('CAST sync: no forecasts returned');
+    return { processed: 0, timestamp: new Date().toISOString() };
+  }
+
+  const pool = getDbPool();
+  let upserted = 0;
+
+  for (const f of forecasts) {
+    if (!f.country || !f.year || !f.month) continue;
+    await pool.query(
+      `INSERT INTO cast_forecasts
+         (country, admin1, year, month, total_forecast, battles_forecast, erv_forecast, vac_forecast, fetched_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+       ON CONFLICT (country, COALESCE(admin1, ''), year, month)
+       DO UPDATE SET
+         total_forecast    = EXCLUDED.total_forecast,
+         battles_forecast  = EXCLUDED.battles_forecast,
+         erv_forecast      = EXCLUDED.erv_forecast,
+         vac_forecast      = EXCLUDED.vac_forecast,
+         fetched_at        = NOW()`,
+      [
+        f.country,
+        f.admin1 || null,
+        f.year,
+        f.month,
+        f.total_forecast   || 0,
+        f.battles_forecast || 0,
+        f.erv_forecast     || 0,
+        f.vac_forecast     || 0,
+      ]
+    );
+    upserted++;
+  }
+
+  logger.info(`CAST sync complete: ${upserted} records upserted`);
+  return { processed: upserted, timestamp: new Date().toISOString() };
 });
 
 energyQueue.process(async (job) => {
@@ -140,11 +192,20 @@ analysisQueue.process(async (job) => {
 // Schedule recurring jobs
 const scheduleJobs = () => {
   // Conflicts: Hourly sync
-  conflictQueue.add({}, { 
+  conflictQueue.add({}, {
     repeat: { cron: '0 * * * *' },
     removeOnComplete: 100,
     removeOnFail: 50
   });
+
+  // CAST forecasts: Weekly sync (Mondays 06:00 UTC — ACLED publishes Monday mornings)
+  castQueue.add({}, {
+    repeat: { cron: '0 6 * * 1' },
+    removeOnComplete: 10,
+    removeOnFail: 5
+  });
+  // Also run once on startup so the table is populated immediately
+  castQueue.add({ startup: true }, { delay: 10_000 });
   
   // Energy: Daily sync
   energyQueue.add({}, { 
@@ -198,6 +259,7 @@ const getQueueStats = async () => {
 
 module.exports = {
   conflictQueue,
+  castQueue,
   energyQueue,
   flightQueue,
   newsQueue,

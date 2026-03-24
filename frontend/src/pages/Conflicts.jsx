@@ -3,7 +3,9 @@ import DashboardContainer from '../components/Layout/DashboardContainer';
 import MapContainer from '../components/Map/MapContainer';
 import ConflictLayer from '../components/Map/ConflictLayer';
 import FilterPanel from '../components/Filters/FilterPanel';
+import CastForecastPanel from '../components/SituationalAwareness/CastForecastPanel';
 import { useGeospatialData } from '../hooks/useGeospatialData';
+import { useCastForecasts } from '../hooks/useCastForecasts';
 
 export default function Conflicts() {
   const [filters, setFilters] = useState({
@@ -15,6 +17,7 @@ export default function Conflicts() {
 
   const [selectedConflict, setSelectedConflict] = useState(null);
   const { conflicts } = useGeospatialData(filters);
+  const { forecasts: castForecasts } = useCastForecasts({ region: filters.region });
 
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
@@ -112,6 +115,17 @@ export default function Conflicts() {
           <div className="space-y-6">
             {/* Filters */}
             <FilterPanel filters={filters} onFilterChange={handleFilterChange} />
+
+            {/* CAST Conflict Forecasts */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-900">Conflict Forecasts</h3>
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">
+                  CAST
+                </span>
+              </div>
+              <CastForecastPanel forecasts={castForecasts} />
+            </div>
 
             {/* Selected Conflict Details */}
             {selectedConflict && (

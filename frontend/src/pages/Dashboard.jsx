@@ -8,6 +8,7 @@ import CorrelationMatrix from '../components/Charts/CorrelationMatrix';
 import EventTimeline from '../components/SituationalAwareness/EventTimeline';
 import NewsIntelligence from '../components/SituationalAwareness/NewsIntelligence';
 import RecommendationsPanel from '../components/SituationalAwareness/RecommendationsPanel';
+import CastForecastPanel from '../components/SituationalAwareness/CastForecastPanel';
 import FilterPanel from '../components/Filters/FilterPanel';
 import MapContainer from '../components/Map/MapContainer';
 import ConflictLayer from '../components/Map/ConflictLayer';
@@ -16,6 +17,7 @@ import FlightLayer from '../components/Map/FlightLayer';
 import CorrelationOverlay from '../components/Map/CorrelationOverlay';
 import { useSituationalAwareness } from '../hooks/useSituationalAwareness';
 import { useGeospatialData } from '../hooks/useGeospatialData';
+import { useCastForecasts } from '../hooks/useCastForecasts';
 
 export default function Dashboard() {
   const [filters, setFilters] = useState({
@@ -34,6 +36,9 @@ export default function Dashboard() {
 
   const { data, threatLevel, isLoading, triggerAnalysis } = useSituationalAwareness();
   const { conflicts, energyFacilities, flights, correlations } = useGeospatialData(filters);
+  const { forecasts: liveCastForecasts } = useCastForecasts({ region: filters.region });
+  // Analysis results include CAST enriched with event context; fall back to live feed
+  const castForecasts = data?.cast_forecasts?.length ? data.cast_forecasts : liveCastForecasts;
 
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
@@ -210,6 +215,20 @@ export default function Dashboard() {
             <div className="bg-white rounded-lg shadow p-4">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">AI Recommendations</h3>
               <RecommendationsPanel analysis={data} />
+            </div>
+
+            {/* CAST Conflict Forecasts */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-gray-900">Conflict Forecasts</h3>
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">
+                  ACLED CAST
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mb-3">
+                Rolling 4-week political violence predictions · 6 periods ahead
+              </p>
+              <CastForecastPanel forecasts={castForecasts} />
             </div>
           </div>
         </div>
