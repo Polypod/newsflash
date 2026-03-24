@@ -51,20 +51,54 @@ setupQueueEvents(analysisQueue, 'ai-analysis');
 // Job processors
 conflictQueue.process(async (job) => {
   const acledService = require('../services/acledService');
+  const { getDbPool } = require('../config/database');
   const { startDate, endDate, limit } = job.data;
-  
+
   logger.info('Processing conflict sync job', { startDate, endDate, limit });
-  
+
   const conflicts = await acledService.fetchConflicts({
     startDate: startDate || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     endDate,
-    limit: limit || 1000
+    limit: limit || 1000,
   });
-  
-  // TODO: Store conflicts in database
-  logger.info(`Conflict sync complete: ${conflicts.length} conflicts fetched`);
-  
-  return { processed: conflicts.length, timestamp: new Date().toISOString() };
+
+  if (!conflicts.length) {
+    logger.warn('Conflict sync: no conflicts returned from ACLED');
+    return { processed: 0, timestamp: new Date().toISOString() };
+  }
+
+  const pool = getDbPool();
+  let upserted = 0;
+
+  for (const c of conflicts) {
+    if (!c.external_id) continue;
+    const [lon, lat] = c.location?.coordinates || [0, 0];
+    if (!lon && !lat) continue;
+
+    await pool.query(
+      `INSERT INTO conflicts
+         (source, external_id, title, description, event_type, severity,
+          location, region, country, event_date, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,
+               ST_SetSRID(ST_MakePoint($7,$8),4326),
+               $9,$10,$11,NOW())
+       ON CONFLICT (external_id) DO UPDATE SET
+         title       = EXCLUDED.title,
+         severity    = EXCLUDED.severity,
+         event_date  = EXCLUDED.event_date`,
+      [
+        'acled', c.external_id, c.title, c.description,
+        c.event_type, c.severity,
+        lon, lat,
+        c.region, c.country,
+        c.event_date || null,
+      ]
+    );
+    upserted++;
+  }
+
+  logger.info(`Conflict sync complete: ${upserted} ACLED conflicts upserted`);
+  return { processed: upserted, timestamp: new Date().toISOString() };
 });
 
 // CAST sync: fetch all-country forecasts from ACLED and upsert into cast_forecasts table.

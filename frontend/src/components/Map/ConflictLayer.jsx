@@ -8,22 +8,26 @@ export default function ConflictLayer({ data = [], visible = true }) {
 
   const geojson = {
     type: 'FeatureCollection',
-    features: data.map((conflict) => ({
-      type: 'Feature',
-      geometry: {
-        type: 'Point',
-        coordinates: conflict.location?.coordinates || [0, 0],
-      },
-      properties: {
-        id: conflict.id,
-        title: conflict.title,
-        severity: conflict.severity,
-        event_type: conflict.event_type,
-        country: conflict.country,
-        region: conflict.region,
-        event_date: conflict.event_date,
-      },
-    })),
+    features: data
+      .filter(c => c.location?.coordinates?.length === 2)
+      .map((conflict) => ({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: conflict.location.coordinates,
+        },
+        properties: {
+          id: conflict.id,
+          title: conflict.title,
+          severity: conflict.severity,
+          event_type: conflict.event_type,
+          country: conflict.country,
+          region: conflict.region,
+          event_date: conflict.event_date,
+          // source used to visually distinguish UCDP (teal stroke) vs ACLED (white stroke)
+          source: conflict.source || 'acled',
+        },
+      })),
   };
 
   const severityColors = {
@@ -57,7 +61,12 @@ export default function ConflictLayer({ data = [], visible = true }) {
           ],
           'circle-opacity': 0.8,
           'circle-stroke-width': 2,
-          'circle-stroke-color': '#ffffff',
+          // UCDP events get a teal border to mark them as academically verified
+          'circle-stroke-color': [
+            'match', ['get', 'source'],
+            'ucdp', '#14b8a6',
+            '#ffffff',
+          ],
         }}
       />
       <Layer

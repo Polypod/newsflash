@@ -22,50 +22,69 @@ router.get('/', async (req, res, next) => {
       return res.json(JSON.parse(cached));
     }
 
-    // Build query
-    let query = `
-      SELECT id, source, external_id, title, description, event_type, 
-             severity, ST_AsGeoJSON(location) as location, region, country, 
-             event_date, created_at
-      FROM conflicts
-      WHERE 1=1
-    `;
+    // UNION of ACLED conflicts + UCDP GED events — both normalised to the same shape.
+    // ucdp_events table may be empty on first run (populated by the ucdp-ged queue job).
     const params = [];
-    let paramIndex = 1;
+    let p = 1;
 
-    if (startDate) {
-      query += ` AND event_date >= $${paramIndex}`;
-      params.push(startDate);
-      paramIndex++;
-    }
+    const dateFilter = (alias) => {
+      let clause = '';
+      if (startDate) { clause += ` AND ${alias}.event_date >= $${p}`; params.push(startDate); p++; }
+      if (endDate)   { clause += ` AND ${alias}.event_date <= $${p}`; params.push(endDate);   p++; }
+      if (bbox) {
+        const [minLon, minLat, maxLon, maxLat] = bbox.split(',').map(Number);
+        clause += ` AND ${alias}.location && ST_MakeEnvelope($${p},$${p+1},$${p+2},$${p+3},4326)`;
+        params.push(minLon, minLat, maxLon, maxLat);
+        p += 4;
+      }
+      return clause;
+    };
 
-    if (endDate) {
-      query += ` AND event_date <= $${paramIndex}`;
-      params.push(endDate);
-      paramIndex++;
-    }
+    const acledFilter  = dateFilter('c');
+    const ucdpFilter   = dateFilter('u');
 
-    if (bbox) {
-      const [minLon, minLat, maxLon, maxLat] = bbox.split(',').map(Number);
-      query += ` AND location && ST_MakeEnvelope($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, 4326)`;
-      params.push(minLon, minLat, maxLon, maxLat);
-      paramIndex += 4;
-    }
+    // Push limit once — used in the outer ORDER BY LIMIT
+    const limitVal = parseInt(limit);
+    params.push(limitVal);
+    const limitParam = p;
 
-    query += ` ORDER BY event_date DESC LIMIT $${paramIndex}`;
-    params.push(parseInt(limit));
+    const query = `
+      SELECT id::text, source, external_id, title, description, event_type,
+             severity, ST_AsGeoJSON(location) AS location,
+             region, country, event_date, created_at
+      FROM conflicts c
+      WHERE 1=1 ${acledFilter}
+
+      UNION ALL
+
+      SELECT id::text,
+             'ucdp'     AS source,
+             external_id,
+             COALESCE(conflict_name, dyad_name, event_type) AS title,
+             source_headline AS description,
+             event_type,
+             severity,
+             ST_AsGeoJSON(location) AS location,
+             region, country, event_date,
+             fetched_at AS created_at
+      FROM ucdp_events u
+      WHERE 1=1 ${ucdpFilter}
+
+      ORDER BY event_date DESC
+      LIMIT $${limitParam}
+    `;
 
     const result = await pool.query(query, params);
-    
+
     const response = {
       data: result.rows.map(row => ({
         ...row,
-        location: JSON.parse(row.location)
+        location: row.location ? JSON.parse(row.location) : null,
       })),
       meta: {
         total: result.rows.length,
-        hasMore: result.rows.length === parseInt(limit)
-      }
+        hasMore: result.rows.length === limitVal,
+      },
     };
 
     // Cache for 1 hour

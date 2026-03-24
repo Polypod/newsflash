@@ -50,3 +50,26 @@
 │  └──────────────────────────────────────────────────────┘   │
 │                                                               │
 └─────────────────────────────────────────────────────────────┘
+
+async def predict_event_risk(
+    target_region: str,
+    event_type: str,  # "military_conflict", "humanitarian_crisis", etc.
+    time_horizon: str = "30_days",  # "7_days", "30_days", "90_days"
+    include_explanation: bool = True,
+    confidence_threshold: float = 0.65,
+) -> EventPredictionResult:
+    """
+    Predicts likelihood of significant geopolitical events using 
+    multi-source data correlation and agentic reasoning.
+    
+    Args:
+        target_region: Geographic region (country/region ISO code)
+        event_type: Type of event to predict
+        time_horizon: Prediction window
+        include_explanation: Return detailed causal chain
+        confidence_threshold: Only return if confidence >= threshold
+    
+    Returns:
+        EventPredictionResult with risk_score, confidence, 
+        contributing_signals, and reasoning_chain
+    """

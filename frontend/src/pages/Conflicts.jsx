@@ -78,7 +78,7 @@ export default function Conflicts() {
                           <p className="mt-1 text-sm text-gray-500">
                             {conflict.country || 'Unknown location'}
                           </p>
-                          <div className="mt-2 flex items-center space-x-2">
+                          <div className="mt-2 flex items-center flex-wrap gap-1.5">
                             <span
                               className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                                 conflict.severity === 'critical'
@@ -95,6 +95,11 @@ export default function Conflicts() {
                             <span className="text-xs text-gray-500">
                               {conflict.event_type || 'Unknown type'}
                             </span>
+                            {conflict.source === 'ucdp' && (
+                              <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium bg-teal-50 text-teal-700 border border-teal-200">
+                                UCDP
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="text-xs text-gray-500">
