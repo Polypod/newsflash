@@ -9,6 +9,7 @@ import EventTimeline from '../components/SituationalAwareness/EventTimeline';
 import NewsIntelligence from '../components/SituationalAwareness/NewsIntelligence';
 import RecommendationsPanel from '../components/SituationalAwareness/RecommendationsPanel';
 import CastForecastPanel from '../components/SituationalAwareness/CastForecastPanel';
+import UCDPConflictsPanel from '../components/SituationalAwareness/UCDPConflictsPanel';
 import FilterPanel from '../components/Filters/FilterPanel';
 import MapContainer from '../components/Map/MapContainer';
 import ConflictLayer from '../components/Map/ConflictLayer';
@@ -18,6 +19,7 @@ import CorrelationOverlay from '../components/Map/CorrelationOverlay';
 import { useSituationalAwareness } from '../hooks/useSituationalAwareness';
 import { useGeospatialData } from '../hooks/useGeospatialData';
 import { useCastForecasts } from '../hooks/useCastForecasts';
+import { useUCDPData } from '../hooks/useUCDPData';
 
 export default function Dashboard() {
   const [filters, setFilters] = useState({
@@ -37,8 +39,12 @@ export default function Dashboard() {
   const { data, threatLevel, isLoading, triggerAnalysis } = useSituationalAwareness();
   const { conflicts, energyFacilities, flights, correlations } = useGeospatialData(filters);
   const { forecasts: liveCastForecasts } = useCastForecasts({ region: filters.region });
+  const { events: ucdpEvents, context: ucdpContext } = useUCDPData();
   // Analysis results include CAST enriched with event context; fall back to live feed
   const castForecasts = data?.cast_forecasts?.length ? data.cast_forecasts : liveCastForecasts;
+  // UCDP: prefer analysis-enriched data, fall back to live DB query
+  const displayUcdpEvents    = data?.ucdp_events?.length    ? data.ucdp_events    : ucdpEvents;
+  const displayUcdpConflicts = data?.ucdp_conflicts?.length ? data.ucdp_conflicts : ucdpContext.dyadic;
 
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
@@ -229,6 +235,20 @@ export default function Dashboard() {
                 Rolling 4-week political violence predictions · 6 periods ahead
               </p>
               <CastForecastPanel forecasts={castForecasts} />
+            </div>
+
+            {/* UCDP Verified Conflict Data */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-gray-900">Verified Conflicts</h3>
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                  UCDP
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mb-3">
+                Georeferenced events with source citations · state-based, non-state &amp; one-sided violence
+              </p>
+              <UCDPConflictsPanel events={displayUcdpEvents} conflicts={displayUcdpConflicts} />
             </div>
           </div>
         </div>

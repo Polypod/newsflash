@@ -33,6 +33,8 @@ class AnalysisResponse(BaseModel):
     threat_level: str
     total_articles: int
     geopolitical_events: List[dict]
+    ucdp_events: List[dict] = []
+    ucdp_conflicts: List[dict] = []
     infrastructure_at_risk: List[dict]
     cast_forecasts: List[dict] = []
     financial_signals: List[dict] = []
@@ -61,6 +63,8 @@ async def analyze_situation(
             threat_level=result.get("threat_level", "unknown"),
             total_articles=result.get("total_articles", 0),
             geopolitical_events=result.get("geopolitical_events", []),
+            ucdp_events=result.get("ucdp_events", []),
+            ucdp_conflicts=result.get("ucdp_conflicts", []),
             infrastructure_at_risk=result.get("infrastructure_at_risk", []),
             cast_forecasts=result.get("cast_forecasts", []),
             financial_signals=result.get("financial_signals", []),

@@ -4,8 +4,10 @@ import MapContainer from '../components/Map/MapContainer';
 import ConflictLayer from '../components/Map/ConflictLayer';
 import FilterPanel from '../components/Filters/FilterPanel';
 import CastForecastPanel from '../components/SituationalAwareness/CastForecastPanel';
+import UCDPConflictsPanel from '../components/SituationalAwareness/UCDPConflictsPanel';
 import { useGeospatialData } from '../hooks/useGeospatialData';
 import { useCastForecasts } from '../hooks/useCastForecasts';
+import { useUCDPData } from '../hooks/useUCDPData';
 
 export default function Conflicts() {
   const [filters, setFilters] = useState({
@@ -18,6 +20,7 @@ export default function Conflicts() {
   const [selectedConflict, setSelectedConflict] = useState(null);
   const { conflicts } = useGeospatialData(filters);
   const { forecasts: castForecasts } = useCastForecasts({ region: filters.region });
+  const { events: ucdpEvents, context: ucdpContext } = useUCDPData();
 
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
@@ -125,6 +128,17 @@ export default function Conflicts() {
                 </span>
               </div>
               <CastForecastPanel forecasts={castForecasts} />
+            </div>
+
+            {/* UCDP Verified Conflict Data */}
+            <div className="bg-white rounded-lg shadow p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-900">Verified Conflicts</h3>
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                  UCDP
+                </span>
+              </div>
+              <UCDPConflictsPanel events={ucdpEvents} conflicts={ucdpContext.dyadic} />
             </div>
 
             {/* Selected Conflict Details */}

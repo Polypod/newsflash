@@ -103,6 +103,65 @@ CREATE TABLE IF NOT EXISTS cast_forecasts (
 CREATE INDEX IF NOT EXISTS idx_cast_country ON cast_forecasts(country);
 CREATE INDEX IF NOT EXISTS idx_cast_period ON cast_forecasts(year, month DESC);
 
+-- UCDP GED events (Georeferenced Event Dataset)
+-- Source-cited, academically verified violence events (1989–present, annual releases).
+-- type_of_violence: 1=state-based, 2=non-state, 3=one-sided.
+-- Fatality columns store best/low/high estimates (UCDP range methodology).
+-- Synced daily by the ucdp-ged background job.
+CREATE TABLE IF NOT EXISTS ucdp_events (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  external_id VARCHAR(50) UNIQUE NOT NULL,      -- UCDP GED integer id
+  conflict_name VARCHAR(255),
+  dyad_name VARCHAR(255),
+  type_of_violence SMALLINT,                     -- 1/2/3
+  event_type VARCHAR(50),                        -- mapped from type_of_violence
+  severity VARCHAR(20),
+  location GEOMETRY(Point, 4326),
+  region VARCHAR(100),
+  country VARCHAR(100),
+  admin1 VARCHAR(100),
+  event_date DATE,
+  date_end DATE,
+  side_a VARCHAR(255),
+  side_b VARCHAR(255),
+  fatalities_best INT DEFAULT 0,
+  fatalities_low INT DEFAULT 0,
+  fatalities_high INT DEFAULT 0,
+  source_headline TEXT,
+  source_article TEXT,
+  fetched_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ucdp_location ON ucdp_events USING GIST(location);
+CREATE INDEX IF NOT EXISTS idx_ucdp_event_date ON ucdp_events(event_date DESC);
+CREATE INDEX IF NOT EXISTS idx_ucdp_country ON ucdp_events(country);
+CREATE INDEX IF NOT EXISTS idx_ucdp_violence_type ON ucdp_events(type_of_violence);
+
+-- UCDP dyadic conflicts (annual active conflict episodes per actor pair)
+-- Tells us which conflicts were active in a given year, at what intensity.
+-- intensity_level: 1=minor (25–999 deaths), 2=war (1000+ deaths/year).
+-- Synced weekly by the ucdp-context background job.
+CREATE TABLE IF NOT EXISTS ucdp_dyadic_conflicts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  dyad_id VARCHAR(20) NOT NULL,
+  conflict_id VARCHAR(20),
+  location VARCHAR(255),
+  side_a VARCHAR(255),
+  side_b VARCHAR(255),
+  incompatibility VARCHAR(10),    -- 1=territory, 2=government, 3=both
+  intensity_level SMALLINT,       -- 1=minor, 2=war
+  type_of_conflict SMALLINT,
+  year INT NOT NULL,
+  start_date DATE,
+  region VARCHAR(100),
+  version VARCHAR(10),
+  fetched_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE (dyad_id, year)
+);
+
+CREATE INDEX IF NOT EXISTS idx_dyadic_year ON ucdp_dyadic_conflicts(year DESC);
+CREATE INDEX IF NOT EXISTS idx_dyadic_location ON ucdp_dyadic_conflicts(location);
+
 -- Create a function to clean up old flights
 CREATE OR REPLACE FUNCTION cleanup_old_flights()
 RETURNS void AS $$

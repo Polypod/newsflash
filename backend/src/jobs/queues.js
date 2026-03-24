@@ -14,6 +14,7 @@ const redisConfig = {
 // Create queues
 const conflictQueue = new Queue('acled-conflicts', redisConfig);
 const castQueue     = new Queue('acled-cast', redisConfig);
+const ucdpQueue     = new Queue('ucdp-ged', redisConfig);
 const energyQueue   = new Queue('eia-energy', redisConfig);
 const flightQueue   = new Queue('aviation-flights', redisConfig);
 const newsQueue     = new Queue('news-ingestion', redisConfig);
@@ -41,6 +42,7 @@ const setupQueueEvents = (queue, queueName) => {
 // Setup event handlers for all queues
 setupQueueEvents(conflictQueue, 'acled-conflicts');
 setupQueueEvents(castQueue, 'acled-cast');
+setupQueueEvents(ucdpQueue, 'ucdp-ged');
 setupQueueEvents(energyQueue, 'eia-energy');
 setupQueueEvents(flightQueue, 'aviation-flights');
 setupQueueEvents(newsQueue, 'news-ingestion');
@@ -113,6 +115,95 @@ castQueue.process(async (job) => {
 
   logger.info(`CAST sync complete: ${upserted} records upserted`);
   return { processed: upserted, timestamp: new Date().toISOString() };
+});
+
+// UCDP GED sync: fetch recent events and upsert into ucdp_events + dyadic tables.
+// GED is released annually; we sync the last 90 days to catch any dataset corrections
+// and populate newly added events from the current version.
+ucdpQueue.process(async (job) => {
+  const ucdpService = require('../services/ucdpService');
+  const { getDbPool } = require('../config/database');
+
+  const { startDate } = job.data;
+  const pool = getDbPool();
+
+  // Default: last 90 days of GED events (dataset goes to 2024-12-31 in v25.1)
+  const effectiveStart = startDate
+    || new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  logger.info('Processing UCDP GED sync job', { startDate: effectiveStart });
+
+  const { events, totalCount } = await ucdpService.fetchGEDEvents({
+    startDate: effectiveStart,
+    pagesize:  1000,
+  });
+
+  if (!events.length) {
+    logger.warn('UCDP GED sync: no events returned', { startDate: effectiveStart });
+    return { processed: 0, timestamp: new Date().toISOString() };
+  }
+
+  let upserted = 0;
+  for (const e of events) {
+    if (!e.external_id) continue;
+    const [lon, lat] = e.location.coordinates;
+    await pool.query(
+      `INSERT INTO ucdp_events
+         (external_id, conflict_name, dyad_name, type_of_violence, event_type, severity,
+          location, region, country, admin1, event_date, date_end,
+          side_a, side_b, fatalities_best, fatalities_low, fatalities_high,
+          source_headline, source_article, fetched_at)
+       VALUES ($1,$2,$3,$4,$5,$6,
+               ST_SetSRID(ST_MakePoint($7,$8),4326),$9,$10,$11,$12,$13,
+               $14,$15,$16,$17,$18,$19,$20,NOW())
+       ON CONFLICT (external_id) DO UPDATE SET
+         conflict_name    = EXCLUDED.conflict_name,
+         fatalities_best  = EXCLUDED.fatalities_best,
+         fatalities_low   = EXCLUDED.fatalities_low,
+         fatalities_high  = EXCLUDED.fatalities_high,
+         fetched_at       = NOW()`,
+      [
+        e.external_id, e.conflict_name, e.dyad_name,
+        e.type_of_violence, e.event_type, e.severity,
+        lon, lat,
+        e.region, e.country, e.admin1,
+        e.event_date || null, e.date_end || null,
+        e.actors?.[0] || null, e.actors?.[1] || null,
+        e.fatalities || 0, e.fatalities_low || 0, e.fatalities_high || 0,
+        e.source_headline || null, e.source_article || null,
+      ]
+    );
+    upserted++;
+  }
+
+  // Sync dyadic conflicts for the current year
+  const currentYear = new Date().getFullYear() - 1; // GED data lags by one year
+  const dyadic = await ucdpService.fetchDyadicConflicts({ year: currentYear });
+  let dyadicUpserted = 0;
+  for (const d of dyadic) {
+    if (!d.dyad_id || !d.year) continue;
+    await pool.query(
+      `INSERT INTO ucdp_dyadic_conflicts
+         (dyad_id, conflict_id, location, side_a, side_b, incompatibility,
+          intensity_level, type_of_conflict, year, start_date, region, version, fetched_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW())
+       ON CONFLICT (dyad_id, year) DO UPDATE SET
+         intensity_level = EXCLUDED.intensity_level,
+         fetched_at      = NOW()`,
+      [
+        d.dyad_id, d.conflict_id || null, d.location || null,
+        d.side_a || null, d.side_b || null, d.incompatibility || null,
+        d.intensity_level ? parseInt(d.intensity_level) : null,
+        d.type_of_conflict ? parseInt(d.type_of_conflict) : null,
+        parseInt(d.year),
+        d.start_date || null, d.region || null, d.version || null,
+      ]
+    );
+    dyadicUpserted++;
+  }
+
+  logger.info(`UCDP sync complete: ${upserted} GED events, ${dyadicUpserted} dyadic conflicts upserted`);
+  return { processed: upserted, dyadic: dyadicUpserted, timestamp: new Date().toISOString() };
 });
 
 energyQueue.process(async (job) => {
@@ -206,6 +297,15 @@ const scheduleJobs = () => {
   });
   // Also run once on startup so the table is populated immediately
   castQueue.add({ startup: true }, { delay: 10_000 });
+
+  // UCDP GED: Daily sync (02:00 UTC) — catches dataset corrections and new annual releases
+  ucdpQueue.add({}, {
+    repeat: { cron: '0 2 * * *' },
+    removeOnComplete: 10,
+    removeOnFail: 5
+  });
+  // Startup run after 20s (after CAST starts at 10s)
+  ucdpQueue.add({ startup: true }, { delay: 20_000 });
   
   // Energy: Daily sync
   energyQueue.add({}, { 
@@ -260,6 +360,7 @@ const getQueueStats = async () => {
 module.exports = {
   conflictQueue,
   castQueue,
+  ucdpQueue,
   energyQueue,
   flightQueue,
   newsQueue,

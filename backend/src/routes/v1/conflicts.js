@@ -4,6 +4,7 @@ const { getDbPool } = require('../../config/database');
 const { getRedisClient } = require('../../config/redis');
 const logger = require('../../utils/logger');
 const acledService = require('../../services/acledService');
+const ucdpService  = require('../../services/ucdpService');
 
 // GET /api/v1/conflicts
 router.get('/', async (req, res, next) => {
@@ -130,6 +131,75 @@ router.get('/aggregated', async (req, res, next) => {
     res.json(response);
   } catch (error) {
     logger.error('Error fetching aggregated conflicts', { error: error.message });
+    next(error);
+  }
+});
+
+// GET /api/v1/conflicts/ucdp-events
+// UCDP Georeferenced Event Dataset — state-based, non-state, and one-sided
+// violence events with precise lat/lon, source citations, and fatality ranges.
+// Covers 1989–2024 (v25.1). Params: startDate, endDate, countryId, typeOfViolence (1/2/3)
+router.get('/ucdp-events', async (req, res, next) => {
+  try {
+    const { startDate, endDate, countryId, typeOfViolence, limit } = req.query;
+    const redisClient = getRedisClient();
+    const cacheKey = `ucdp:ged:${startDate || 'all'}:${endDate || 'all'}:${countryId || 'all'}:${typeOfViolence || 'all'}`;
+
+    const cached = await redisClient.get(cacheKey);
+    if (cached) return res.json(JSON.parse(cached));
+
+    const { events, totalCount } = await ucdpService.fetchGEDEvents({
+      startDate,
+      endDate,
+      countryId: countryId ? countryId.split(',') : undefined,
+      typeOfViolence: typeOfViolence ? parseInt(typeOfViolence) : undefined,
+      pagesize: limit ? parseInt(limit) : 1000,
+    });
+
+    const response = { data: events, meta: { total: totalCount, returned: events.length } };
+    await redisClient.setEx(cacheKey, 3600, JSON.stringify(response));
+    res.json(response);
+  } catch (error) {
+    logger.error('Error fetching UCDP GED events', { error: error.message });
+    next(error);
+  }
+});
+
+// GET /api/v1/conflicts/ucdp-context
+// Combined UCDP conflict context: active dyadic conflicts + non-state + one-sided
+// violence for the given year/region. Useful for the AI agents' background context.
+// Params: year (defaults to current), region
+router.get('/ucdp-context', async (req, res, next) => {
+  try {
+    const { year, region } = req.query;
+    const redisClient = getRedisClient();
+    const cacheKey = `ucdp:ctx:${year || 'cur'}:${region || 'all'}`;
+
+    const cached = await redisClient.get(cacheKey);
+    if (cached) return res.json(JSON.parse(cached));
+
+    const effectiveYear = year ? parseInt(year) : new Date().getFullYear() - 1;
+
+    const [dyadic, nonstate, onesided] = await Promise.all([
+      ucdpService.fetchDyadicConflicts({ year: effectiveYear, region }),
+      ucdpService.fetchNonstateConflicts({ year: effectiveYear, region }),
+      ucdpService.fetchOnesidedViolence({ year: effectiveYear, region }),
+    ]);
+
+    const response = {
+      data: { dyadic, nonstate, onesided },
+      meta: {
+        year: effectiveYear,
+        dyadic_count: dyadic.length,
+        nonstate_count: nonstate.length,
+        onesided_count: onesided.length,
+      },
+    };
+    // Cache 6h — UCDP data is annual, no need for frequent refresh
+    await redisClient.setEx(cacheKey, 6 * 3600, JSON.stringify(response));
+    res.json(response);
+  } catch (error) {
+    logger.error('Error fetching UCDP context', { error: error.message });
     next(error);
   }
 });
