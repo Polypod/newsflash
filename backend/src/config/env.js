@@ -27,6 +27,7 @@ const config = {
   eiaApiKey: process.env.EIA_API_KEY,
   aviationstackApiKey: process.env.AVIATIONSTACK_API_KEY      // also accepts AVIATIONSTACK_API
     || process.env.AVIATIONSTACK_API,
+  newsApiKey: process.env.NEWS_API_KEY,
 
   // AI Services
   anthropicApiKey: process.env.ANTHROPIC_API_KEY,
