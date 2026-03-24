@@ -34,6 +34,7 @@ class AnalysisResponse(BaseModel):
     total_articles: int
     geopolitical_events: List[dict]
     infrastructure_at_risk: List[dict]
+    financial_signals: List[dict] = []
     recommendations: List[str]
     execution_time_ms: int
     token_usage: int
@@ -60,6 +61,7 @@ async def analyze_situation(
             total_articles=result.get("total_articles", 0),
             geopolitical_events=result.get("geopolitical_events", []),
             infrastructure_at_risk=result.get("infrastructure_at_risk", []),
+            financial_signals=result.get("financial_signals", []),
             recommendations=result.get("recommendations", []),
             execution_time_ms=result.get("execution_time_ms", 0),
             token_usage=result.get("token_usage", 0),
