@@ -10,6 +10,7 @@ const Energy = lazy(() => import('./pages/Energy'));
 const Flights = lazy(() => import('./pages/Flights'));
 const Analysis = lazy(() => import('./pages/Analysis'));
 const Settings = lazy(() => import('./pages/Settings'));
+const Login = lazy(() => import('./pages/Login'));
 
 // Loading component
 function LoadingSpinner() {
@@ -89,6 +90,7 @@ function App() {
                 <Route path="/flights" element={<Flights />} />
                 <Route path="/analysis" element={<Analysis />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/login" element={<Login />} />
               </Routes>
             </Suspense>
           </Router>
