@@ -8,3 +8,5 @@ logs/
 SKILL.md
 AGENTS.md
 CLAUDE.md
+_pycache__/
+__pycache__/
