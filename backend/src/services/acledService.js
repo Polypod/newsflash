@@ -31,8 +31,9 @@ const TOKEN_LIFETIME_MS = (24 * 60 - 5) * 60 * 1000;
 
 class ACLEDService {
   constructor() {
-    this._token = null;
-    this._tokenExpiry = 0;
+    this._token        = null;
+    this._tokenExpiry  = 0;
+    this._refreshToken = null;
   }
 
   // ── Auth ──────────────────────────────────────────────────────────────────
@@ -42,35 +43,64 @@ class ACLEDService {
       return this._token;
     }
 
+    // Prefer refresh_token (14-day validity) over full re-auth
+    if (this._refreshToken) {
+      try {
+        await this._doTokenRequest({
+          grant_type:    'refresh_token',
+          refresh_token: this._refreshToken,
+          client_id:     'acled',
+        });
+        return this._token;
+      } catch (err) {
+        logger.warn('ACLED refresh_token failed, falling back to password grant', { error: err.message });
+        this._refreshToken = null;
+      }
+    }
+
     if (!config.acledEmail || !config.acledPassword) {
       throw new Error('ACLED_EMAIL and ACLED_PASSWORD required for authentication');
     }
 
-    const params = new URLSearchParams({
+    await this._doTokenRequest({
       username:   config.acledEmail,
       password:   config.acledPassword,
       grant_type: 'password',
       client_id:  'acled',
     });
+    return this._token;
+  }
 
-    const response = await axios.post(TOKEN_URL, params.toString(), {
+  async _doTokenRequest(body) {
+    const response = await axios.post(TOKEN_URL, new URLSearchParams(body).toString(), {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
-
-    this._token       = response.data.access_token;
-    this._tokenExpiry = Date.now() + TOKEN_LIFETIME_MS;
-    logger.info('ACLED token refreshed');
-    return this._token;
+    this._token        = response.data.access_token;
+    this._refreshToken = response.data.refresh_token || this._refreshToken;
+    this._tokenExpiry  = Date.now() + TOKEN_LIFETIME_MS;
+    logger.info('ACLED token obtained', { grant: body.grant_type });
   }
 
   async _get(url, params) {
     const token = await this._getToken();
-    const response = await axios.get(url, {
-      params:  { ...params, _format: 'json' },
-      headers: { Authorization: `Bearer ${token}` },
-      timeout: 30_000,
-    });
-    return response.data;
+    try {
+      const response = await axios.get(url, {
+        params:  { ...params, _format: 'json' },
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 30_000,
+      });
+      return response.data;
+    } catch (error) {
+      const status = error.response?.status;
+      const body   = error.response?.data;
+      logger.error('ACLED HTTP error', {
+        status,
+        url,
+        params,
+        body: typeof body === 'object' ? JSON.stringify(body) : body,
+      });
+      throw error;
+    }
   }
 
   // ── Region helper ─────────────────────────────────────────────────────────
