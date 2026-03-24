@@ -85,6 +85,19 @@ for i in $(seq 1 30); do
 done
 ok "Postgres ready"
 
+# ── Database schema bootstrap ─────────────────────────────────────────────────
+# init.sql uses IF NOT EXISTS throughout, so it's idempotent and safe to run on
+# every deploy. This handles both first-deploy creation and any new tables/
+# indexes added in subsequent commits. It does NOT handle ALTER TABLE changes
+# (column additions etc.) — add manual migration steps below if schema evolves.
+step "Applying database schema (init.sql)"
+docker compose -f "$APP_DIR/docker-compose.yml" exec -T postgres \
+  psql -U appuser -d conflicts_db \
+  -f /docker-entrypoint-initdb.d/init.sql \
+  -v ON_ERROR_STOP=1 \
+  --quiet
+ok "Schema up to date"
+
 # ── Backend (Node.js via PM2) ──────────────────────────────────────────────────
 step "Deploying backend"
 cd "$APP_DIR/backend"
@@ -100,6 +113,13 @@ ok "Backend deployed"
 # ── AI Service (Python/uvicorn via PM2) ───────────────────────────────────────
 step "Deploying ai-service"
 cd "$APP_DIR/ai-service"
+
+# Ensure Chroma uses an absolute path so it survives working-dir changes
+if grep -q 'CHROMA_DB_PATH=\./chroma_db' .env 2>/dev/null; then
+  sed -i "s|CHROMA_DB_PATH=./chroma_db|CHROMA_DB_PATH=${APP_DIR}/ai-service/chroma_db|" .env
+  warn "Updated CHROMA_DB_PATH to absolute path in ai-service/.env"
+fi
+mkdir -p "${APP_DIR}/ai-service/chroma_db"
 
 # Create or update virtualenv
 if [[ ! -d ".venv" ]]; then
