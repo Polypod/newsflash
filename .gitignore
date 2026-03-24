@@ -2,7 +2,6 @@
 .env.local
 .env.test
 .env.production
-.gitnexus
 node_modules/
 logs/
 SKILL.md
