@@ -45,15 +45,34 @@ check_cmd python3
 mkdir -p "$LOGS_DIR"
 
 # ── Load root .env.local (API keys etc.) ──────────────────────────────────────
+# Parses the file manually rather than sourcing it — safe against template
+# placeholders (e.g. VITE_{APPNAME}_FOO=) or other non-standard lines.
+load_env_file() {
+  local file="$1"
+  local skipped=0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    # Skip blank lines and comments
+    [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+    # Only export lines with a valid shell variable name before the first =
+    if [[ "$line" =~ ^([a-zA-Z_][a-zA-Z0-9_]*)= ]]; then
+      export "$line"
+    else
+      warn "Skipped invalid .env line: $line"
+      skipped=$((skipped + 1))
+    fi
+  done < "$file"
+  [[ $skipped -gt 0 ]] && warn "$skipped line(s) skipped in $file — fix or remove them"
+}
+
 ROOT_ENV_FILE=""
 if [[ -f "$ROOT/.env.local" ]]; then
   ROOT_ENV_FILE="$ROOT/.env.local"
   log "Loading root .env.local"
-  set -a; source "$ROOT_ENV_FILE"; set +a
+  load_env_file "$ROOT_ENV_FILE"
 elif [[ -f "$ROOT/.env" ]]; then
   ROOT_ENV_FILE="$ROOT/.env"
   warn "No .env.local found — using root .env"
-  set -a; source "$ROOT_ENV_FILE"; set +a
+  load_env_file "$ROOT_ENV_FILE"
 else
   warn "No root .env.local or .env — API keys may be missing (create .env.local)"
 fi
