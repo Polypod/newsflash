@@ -308,18 +308,25 @@ def threat_assessment_agent(state: SituationalAwarenessState):
     
     context = f"""
     GEOPOLITICAL SITUATION REPORT
-    
+
     EVENTS: {json.dumps(state['geopolitical_events'], indent=2)}
-    
+
     INFRASTRUCTURE AT RISK: {json.dumps(state['infrastructure_impacts'], indent=2)}
-    
+
+    FINANCIAL SIGNALS: {json.dumps([{
+        'title': f['title'],
+        'source': f['source'],
+        'tickers': f['tickers'],
+        'tags': f['tags'],
+    } for f in state.get('financial_signals', [])[:5]], indent=2)}
+
     NEWS ARTICLES: {json.dumps([{
         'title': a['title'],
         'source': a['source'],
         'relevance': a['relevance_score']
     } for a in state['news_articles'][:5]], indent=2)}
-    
-    Generate a concise threat assessment for decision-makers.
+
+    Generate a concise threat assessment for decision-makers, incorporating financial market signals where relevant.
     """
     
     assessment = structured_llm.invoke(context)
@@ -338,14 +345,16 @@ _COST_PER_TOKEN_USD = cost_cfg.cost_per_token_usd
 
 
 def output_formatter(state: SituationalAwarenessState):
-    """NODE 5: Format results for frontend"""
+    """NODE 6: Format results for frontend"""
     token_usage = state.get("token_usage", 0)
+    financial_signals = state.get("financial_signals", [])
     final_report = {
         "timestamp": str(datetime.datetime.now()),
         "threat_level": state.get("threat_level", "unknown"),
         "total_articles": len(state["news_articles"]),
         "geopolitical_events": state["geopolitical_events"],
         "infrastructure_at_risk": state["infrastructure_impacts"],
+        "financial_signals": financial_signals,
         "recommendations": state.get("recommendations", []),
         "token_usage": token_usage,
         "cost_usd": round(token_usage * _COST_PER_TOKEN_USD, 6),
@@ -359,22 +368,24 @@ def output_formatter(state: SituationalAwarenessState):
 def build_situational_awareness_workflow():
     """Build the LangGraph workflow"""
     workflow = StateGraph(SituationalAwarenessState)
-    
+
     # Add nodes
     workflow.add_node("news_aggregation", news_aggregation_agent)
     workflow.add_node("geopolitical_analyst", geopolitical_analyst_agent)
     workflow.add_node("infrastructure_correlator", infrastructure_correlator_agent)
+    workflow.add_node("financial_news", financial_news_agent)          # NEW
     workflow.add_node("threat_assessment", threat_assessment_agent)
     workflow.add_node("output_formatter", output_formatter)
-    
+
     # Define edges
     workflow.add_edge(START, "news_aggregation")
     workflow.add_edge("news_aggregation", "geopolitical_analyst")
     workflow.add_edge("geopolitical_analyst", "infrastructure_correlator")
-    workflow.add_edge("infrastructure_correlator", "threat_assessment")
+    workflow.add_edge("infrastructure_correlator", "financial_news")   # NEW
+    workflow.add_edge("financial_news", "threat_assessment")           # CHANGED
     workflow.add_edge("threat_assessment", "output_formatter")
     workflow.add_edge("output_formatter", END)
-    
+
     return workflow.compile()
 
 
@@ -387,6 +398,7 @@ async def analyze_situation(query: str) -> dict:
         "news_articles": [],
         "geopolitical_events": [],
         "infrastructure_impacts": [],
+        "financial_signals": [],
         "threat_assessment": "",
         "threat_level": "",
         "token_usage": 0,
