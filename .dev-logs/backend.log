@@ -1,0 +1,19 @@
+
+> situational-awareness-backend@1.0.0 dev
+> nodemon src/server.js
+
+[33m[nodemon] 3.1.14[39m
+[33m[nodemon] to restart at any time, enter `rs`[39m
+[33m[nodemon] watching path(s): *.*[39m
+[33m[nodemon] watching extensions: js,mjs,cjs,json[39m
+[32m[nodemon] starting `node src/server.js`[39m
+[32minfo[39m: Database connection established {"service":"situational-awareness-backend","timestamp":"2026-03-24 11:20:51"}
+[32minfo[39m: Database connected successfully {"service":"situational-awareness-backend","timestamp":"2026-03-24 11:20:51"}
+[32minfo[39m: Redis client connected {"service":"situational-awareness-backend","timestamp":"2026-03-24 11:20:51"}
+[32minfo[39m: Redis connected successfully {"service":"situational-awareness-backend","timestamp":"2026-03-24 11:20:51"}
+[32minfo[39m: WebSocket handler initialized {"service":"situational-awareness-backend","timestamp":"2026-03-24 11:20:51"}
+[32minfo[39m: Recurring jobs scheduled {"service":"situational-awareness-backend","timestamp":"2026-03-24 11:20:51"}
+[32minfo[39m: Background job queues started {"service":"situational-awareness-backend","timestamp":"2026-03-24 11:20:51"}
+[32minfo[39m: Server running on port 5174 {"service":"situational-awareness-backend","timestamp":"2026-03-24 11:20:51"}
+[32minfo[39m: API Documentation: http://localhost:5174/api-docs {"service":"situational-awareness-backend","timestamp":"2026-03-24 11:20:51"}
+[32minfo[39m: Health check: http://localhost:5174/health {"service":"situational-awareness-backend","timestamp":"2026-03-24 11:20:51"}

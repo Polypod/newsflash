@@ -14,8 +14,8 @@
 
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOGS_DIR="$ROOT/.dev-logs"
+readonly ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly LOGS_DIR="$ROOT/.dev-logs"
 PIDS=()
 NO_FRONTEND=false
 INFRA_ONLY=false
@@ -49,19 +49,30 @@ mkdir -p "$LOGS_DIR"
 # placeholders (e.g. VITE_{APPNAME}_FOO=) or other non-standard lines.
 load_env_file() {
   local file="$1"
-  local skipped=0
+  local key val line loaded=0 skipped=0
   while IFS= read -r line || [[ -n "$line" ]]; do
     # Skip blank lines and comments
     [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
-    # Only export lines with a valid shell variable name before the first =
-    if [[ "$line" =~ ^([a-zA-Z_][a-zA-Z0-9_]*)= ]]; then
-      export "$line"
+    if [[ "$line" =~ ^([a-zA-Z_][a-zA-Z0-9_]*)=(.*) ]]; then
+      key="${BASH_REMATCH[1]}"
+      val="${BASH_REMATCH[2]}"
+      # Strip enclosing quotes (KEY="value" or KEY='value')
+      if   [[ "$val" =~ ^\"(.*)\"$ ]]; then val="${BASH_REMATCH[1]}"
+      elif [[ "$val" =~ ^\'(.*)\'$ ]]; then val="${BASH_REMATCH[1]}"; fi
+      # printf -v assigns without re-expanding $ in values (safe for URLs, tokens etc.)
+      printf -v "$key" '%s' "$val"
+      export "$key"
+      loaded=$((loaded + 1))
     else
-      warn "Skipped invalid .env line: $line"
+      warn "Skipped invalid line: $line"
       skipped=$((skipped + 1))
     fi
   done < "$file"
-  [[ $skipped -gt 0 ]] && warn "$skipped line(s) skipped in $file — fix or remove them"
+  if [[ $skipped -gt 0 ]]; then
+    ok "Loaded $loaded vars ($skipped skipped) from $(basename "$file")"
+  else
+    ok "Loaded $loaded vars from $(basename "$file")"
+  fi
 }
 
 ROOT_ENV_FILE=""
@@ -148,17 +159,23 @@ PIDS+=($!)
 ok "Backend started (pid $!, log: .dev-logs/backend.log)"
 
 # ── AI Service ─────────────────────────────────────────────────────────────────
+check_cmd uv
+
 if [[ ! -d "$ROOT/ai-service/.venv" ]]; then
   log "Creating ai-service virtualenv..."
-  python3 -m venv "$ROOT/ai-service/.venv"
+  uv venv "$ROOT/ai-service/.venv"
 fi
 
 log "Checking ai-service dependencies..."
-(cd "$ROOT/ai-service" && .venv/bin/pip install -q -r requirements.txt) \
-  >> "$LOGS_DIR/ai-service-install.log" 2>&1
+if ! (cd "$ROOT/ai-service" && uv pip install -q -r requirements.txt) \
+    >> "$LOGS_DIR/ai-service-install.log" 2>&1; then
+  err "uv pip install failed. Last 20 lines of log:"
+  tail -20 "$LOGS_DIR/ai-service-install.log" >&2
+  exit 1
+fi
 
 log "Starting ai-service..."
-(cd "$ROOT/ai-service" && .venv/bin/uvicorn src.main:app --reload --port 8000 --host 127.0.0.1) \
+(cd "$ROOT/ai-service" && PYTHONPATH=src .venv/bin/uvicorn src.main:app --reload --port 8000 --host 127.0.0.1) \
   > "$LOGS_DIR/ai-service.log" 2>&1 &
 PIDS+=($!)
 ok "AI service started (pid $!, log: .dev-logs/ai-service.log)"

@@ -123,15 +123,10 @@ mkdir -p "${APP_DIR}/ai-service/chroma_db"
 
 # Create or update virtualenv
 if [[ ! -d ".venv" ]]; then
-  python3.12 -m venv .venv
+  uv venv .venv
 fi
 
-# Install dependencies (prefer uv if available, fall back to pip)
-if command -v uv &>/dev/null; then
-  uv pip install --python .venv/bin/python -r requirements.txt -q
-else
-  .venv/bin/pip install -q -r requirements.txt
-fi
+uv pip install --python .venv/bin/python -r requirements.txt -q
 
 export APP_DIR
 if pm2 describe newsflash-ai &>/dev/null; then

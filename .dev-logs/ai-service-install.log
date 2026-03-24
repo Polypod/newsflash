@@ -1,0 +1,4 @@
++ cd /Users/henrik/vsc_projects/newsflash/ai-service
++ .venv/bin/pip install -q -r requirements.txt
+dev.sh: line 168: .venv/bin/pip: No such file or directory
+dev.sh: line 168: .venv/bin/pip: No such file or directory

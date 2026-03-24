@@ -36,6 +36,7 @@ module.exports = {
       max_memory_restart: '1G',
       env_production: {
         ENVIRONMENT: 'production',
+        PYTHONPATH: `${APP_DIR}/ai-service/src`,
       },
       error_file: '/var/log/newsflash/ai-error.log',
       out_file: '/var/log/newsflash/ai-out.log',
