@@ -386,7 +386,7 @@ scoringQueue.process(async (job) => {
   try {
     const redis = getRedisClient();
     const keys = await redis.keys('news:headlines:*');
-    if (keys.length) await redis.del(keys);
+    if (keys.length) await redis.del(...keys);
   } catch (e) {
     logger.warn('Redis cache invalidation failed (non-fatal):', e.message);
   }
