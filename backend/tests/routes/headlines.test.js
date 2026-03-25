@@ -57,4 +57,11 @@ describe('GET /api/v1/news/headlines', () => {
     expect(res.status).toBe(200);
     expect(res.body.articles).toEqual([]);
   });
+
+  it('queries both newsapi-top and tiingo source types', async () => {
+    mockQuery.mockResolvedValue({ rows: sampleRows });
+    await request(app).get('/api/v1/news/headlines');
+    const sql = mockQuery.mock.calls[0][0];
+    expect(sql).toMatch(/source_type IN \('newsapi-top', 'tiingo'\)/);
+  });
 });

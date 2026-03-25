@@ -91,7 +91,7 @@ router.get('/headlines', async (req, res, next) => {
       SELECT id, source, title, content, url, published_at,
              criticality_score, criticality_reason, source_type
       FROM news_articles na
-      WHERE source_type = 'newsapi-top'
+      WHERE source_type IN ('newsapi-top', 'tiingo')
         AND ${scoreFilter}
       ORDER BY COALESCE(criticality_score, 0) DESC, published_at DESC
       LIMIT $1
