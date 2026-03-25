@@ -22,7 +22,6 @@ router.post('/articles', async (req, res, next) => {
   const pool = getDbPool();
   let inserted = 0;
   let skipped = 0;
-  const newIds = [];
 
   for (const a of articles) {
     try {
@@ -36,8 +35,15 @@ router.post('/articles', async (req, res, next) => {
          a.published_at, a.category, a.author, a.source_type],
       );
       if (result.rows.length > 0) {
-        newIds.push(result.rows[0].id);
         inserted++;
+        try {
+          await scoringQueue.add(
+            { articleId: result.rows[0].id },
+            { attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
+          );
+        } catch (queueErr) {
+          logger.error('ingest: queue error', { external_id: a.external_id, err: queueErr.message });
+        }
       } else {
         skipped++;
       }
@@ -45,13 +51,6 @@ router.post('/articles', async (req, res, next) => {
       logger.error('ingest: DB error', { external_id: a.external_id, err: err.message });
       return next(err);
     }
-  }
-
-  for (const id of newIds) {
-    await scoringQueue.add(
-      { articleId: id },
-      { attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
-    );
   }
 
   res.json({ inserted, skipped });
