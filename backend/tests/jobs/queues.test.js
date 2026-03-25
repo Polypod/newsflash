@@ -37,6 +37,7 @@ describe('scheduleJobs with newsApiEnabled=false', () => {
 
   it('still schedules acled-conflicts', () => {
     const idx = Bull.mock.calls.findIndex(([name]) => name === 'acled-conflicts');
+    expect(idx).toBeGreaterThanOrEqual(0);
     const conflictsInstance = Bull.mock.results[idx].value;
     expect(conflictsInstance.add).toHaveBeenCalled();
   });
