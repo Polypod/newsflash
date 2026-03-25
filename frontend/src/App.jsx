@@ -86,8 +86,8 @@ function App() {
         <DataProvider>
           <FilterProvider>
             <Router>
+              <NewsflashToast />
               <Suspense fallback={<LoadingSpinner />}>
-                <NewsflashToast />
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/conflicts" element={<Conflicts />} />
