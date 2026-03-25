@@ -6,7 +6,7 @@ asyncio.to_thread so it does not block the FastAPI event loop.
 """
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -52,7 +52,7 @@ async def start_scheduler(tiingo_cfg, tiingo_api_key: str, backend_url: str, int
     scheduler.add_job(
         run_tiingo_ingest,
         "date",
-        run_date=datetime.now() + timedelta(seconds=5),
+        run_date=datetime.now(tz=timezone.utc) + timedelta(seconds=5),
         args=args,
         id="tiingo_startup",
     )
