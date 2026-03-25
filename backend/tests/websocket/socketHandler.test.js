@@ -26,7 +26,7 @@ describe('WebSocket auth', () => {
   });
 
   afterAll((done) => {
-    handler.io.close(done);
+    handler.io.close(() => httpServer.close(done));
   });
 
   it('disconnects client with no token', (done) => {
@@ -67,7 +67,7 @@ describe('broadcastNewsflash', () => {
   });
 
   afterAll((done) => {
-    handler.io.close(done);
+    handler.io.close(() => httpServer.close(done));
   });
 
   it('broadcasts newsflash event to news room with all expected fields', (done) => {
@@ -81,7 +81,7 @@ describe('broadcastNewsflash', () => {
       url: 'https://reuters.com/test',
       criticality_score: 92,
       criticality_reason: 'Active military conflict',
-      published_at: new Date('2026-03-24T10:00:00Z'),
+      published_at: '2026-03-24T10:00:00.000Z',
     };
 
     client.on('connect', () => {
@@ -98,8 +98,8 @@ describe('broadcastNewsflash', () => {
           expect(payload.url).toBe(mockArticle.url);
           expect(payload.criticality_score).toBe(mockArticle.criticality_score);
           expect(payload.criticality_reason).toBe(mockArticle.criticality_reason);
-          // published_at is serialized to ISO string by Socket.io
-          expect(payload.published_at).toBe(mockArticle.published_at.toISOString());
+          // published_at is already an ISO string
+          expect(payload.published_at).toBe(mockArticle.published_at);
 
           // Verify timestamp is a string (ISO format)
           expect(typeof payload.timestamp).toBe('string');
@@ -124,5 +124,40 @@ describe('broadcastNewsflash', () => {
         done(new Error('Server rejected valid token'));
       }
     });
-  }, 10000);
+  }, 2000);
+
+  it('does not broadcast to clients not in the news room', (done) => {
+    const token = jwt.sign({ role: 'user' }, JWT_SECRET);
+    const client = ioc(`http://localhost:${port}`, {
+      auth: { token },
+    });
+
+    client.on('connect', () => {
+      // Join a different room, not 'news'
+      client.emit('subscribe', 'conflicts');
+
+      // Wait briefly for subscription, then broadcast
+      setTimeout(() => {
+        let receivedNewsflash = false;
+        client.on('newsflash', () => { receivedNewsflash = true; });
+
+        handler.broadcastNewsflash({
+          id: 99,
+          title: 'Should Not Arrive',
+          source: 'Test',
+          url: 'https://test.com',
+          criticality_score: 92,
+          criticality_reason: 'Test',
+          published_at: '2026-03-24T10:00:00.000Z',
+        });
+
+        // Give time for any event to arrive
+        setTimeout(() => {
+          expect(receivedNewsflash).toBe(false);
+          client.disconnect();
+          done();
+        }, 200);
+      }, 100);
+    });
+  }, 2000);
 });
