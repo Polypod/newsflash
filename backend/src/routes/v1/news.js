@@ -69,7 +69,7 @@ const LEVEL_FILTERS = {
   critical: 'na.criticality_score >= 85',
   high:     'na.criticality_score BETWEEN 65 AND 84',
   medium:   'na.criticality_score BETWEEN 40 AND 64',
-  all:      '(criticality_score >= 40 OR criticality_score IS NULL)',
+  all:      '(na.criticality_score >= 40 OR na.criticality_score IS NULL)',
 };
 
 // GET /api/v1/news/headlines

@@ -48,7 +48,7 @@ describe('GET /api/v1/news/headlines', () => {
     mockQuery.mockResolvedValue({ rows: sampleRows });
     const res = await request(app).get('/api/v1/news/headlines?level=all');
     const sql = mockQuery.mock.calls[0][0];
-    expect(sql).toMatch(/criticality_score >= 40 OR criticality_score IS NULL/);
+    expect(sql).toMatch(/na\.criticality_score >= 40 OR na\.criticality_score IS NULL/);
   });
 
   it('returns 200 with empty array when no rows', async () => {
