@@ -19,6 +19,8 @@ const energyQueue   = new Queue('eia-energy', redisConfig);
 const flightQueue   = new Queue('aviation-flights', redisConfig);
 const newsQueue     = new Queue('news-ingestion', redisConfig);
 const analysisQueue = new Queue('ai-analysis', redisConfig);
+const headlinesQueue = new Queue('newsapi-headlines', redisConfig);
+const scoringQueue   = new Queue('news-scoring', redisConfig);
 
 // Queue event handlers
 const setupQueueEvents = (queue, queueName) => {
@@ -47,6 +49,8 @@ setupQueueEvents(energyQueue, 'eia-energy');
 setupQueueEvents(flightQueue, 'aviation-flights');
 setupQueueEvents(newsQueue, 'news-ingestion');
 setupQueueEvents(analysisQueue, 'ai-analysis');
+setupQueueEvents(headlinesQueue, 'newsapi-headlines');
+setupQueueEvents(scoringQueue, 'news-scoring');
 
 // Job processors
 conflictQueue.process(async (job) => {
@@ -314,8 +318,99 @@ analysisQueue.process(async (job) => {
   };
 });
 
+headlinesQueue.process(async (job) => {
+  const { fetchTopHeadlines } = require('../services/newsApiHeadlinesService');
+  const { getDbPool } = require('../config/database');
+
+  logger.info('Processing newsapi-headlines job');
+  const articles = await fetchTopHeadlines();
+  if (!articles.length) {
+    logger.warn('newsapi-headlines: no articles returned');
+    return { processed: 0, timestamp: new Date().toISOString() };
+  }
+
+  const pool = getDbPool();
+  let inserted = 0;
+  const newIds = [];
+
+  for (const a of articles) {
+    const result = await pool.query(
+      `INSERT INTO news_articles
+         (source, external_id, title, content, url, published_at, category, author, source_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'newsapi-top')
+       ON CONFLICT (external_id) DO NOTHING
+       RETURNING id`,
+      [a.source, a.external_id, a.title, a.content, a.url,
+       a.published_at, a.category, a.author]
+    );
+    if (result.rows.length > 0) {
+      newIds.push(result.rows[0].id);
+      inserted++;
+    }
+  }
+
+  // Enqueue each new article for scoring
+  for (const id of newIds) {
+    await scoringQueue.add({ articleId: id }, { attempts: 3, backoff: { type: 'exponential', delay: 5000 } });
+  }
+
+  logger.info(`newsapi-headlines: ${inserted} new articles inserted, ${newIds.length} queued for scoring`);
+  return { processed: inserted, timestamp: new Date().toISOString() };
+});
+
+// Populated by scheduleJobs(socketHandler) — see below
+let _socketHandler = null;
+
+scoringQueue.process(async (job) => {
+  const { articleId } = job.data;
+  const { scoreHeadline } = require('../services/scoringService');
+  const { getDbPool } = require('../config/database');
+  const { getRedisClient } = require('../config/redis');
+
+  const pool = getDbPool();
+  const row = await pool.query(
+    'SELECT id, title, content, source, url, published_at FROM news_articles WHERE id = $1',
+    [articleId]
+  );
+  if (!row.rows.length) return { skipped: true };
+
+  const article = row.rows[0];
+  const { score, reason } = await scoreHeadline(article.title, article.content);
+
+  await pool.query(
+    'UPDATE news_articles SET criticality_score = $1, criticality_reason = $2 WHERE id = $3',
+    [score, reason, articleId]
+  );
+
+  // Invalidate headlines cache
+  try {
+    const redis = getRedisClient();
+    const keys = await redis.keys('news:headlines:*');
+    if (keys.length) await redis.del(keys);
+  } catch (e) {
+    logger.warn('Redis cache invalidation failed (non-fatal):', e.message);
+  }
+
+  // Broadcast if critical
+  if (score !== null && score >= 85 && _socketHandler) {
+    _socketHandler.broadcastNewsflash({
+      id: article.id,
+      title: article.title,
+      source: article.source,
+      url: row.rows[0].url,
+      criticality_score: score,
+      criticality_reason: reason,
+      published_at: row.rows[0].published_at,
+    });
+  }
+
+  logger.info(`news-scoring: article ${articleId} scored ${score}`);
+  return { articleId, score, timestamp: new Date().toISOString() };
+});
+
 // Schedule recurring jobs
-const scheduleJobs = () => {
+const scheduleJobs = (socketHandler) => {
+  _socketHandler = socketHandler;
   // Conflicts: Hourly sync
   conflictQueue.add({}, {
     repeat: { cron: '0 * * * *' },
@@ -356,12 +451,21 @@ const scheduleJobs = () => {
   });
   
   // News ingestion: Every 30 minutes
-  newsQueue.add({}, { 
+  newsQueue.add({}, {
     repeat: { every: 30 * 60 * 1000 },
     removeOnComplete: 100,
     removeOnFail: 50
   });
-  
+
+  // NewsAPI top-headlines: every 15 min
+  headlinesQueue.add({}, {
+    repeat: { every: 15 * 60 * 1000 },
+    removeOnComplete: 100,
+    removeOnFail: 50,
+  });
+  // Startup run (populate immediately)
+  headlinesQueue.add({ startup: true }, { delay: 5_000 });
+
   logger.info('Recurring jobs scheduled');
 };
 
@@ -374,7 +478,9 @@ const getQueueStats = async () => {
     { name: 'energy', queue: energyQueue },
     { name: 'flights', queue: flightQueue },
     { name: 'news', queue: newsQueue },
-    { name: 'analysis', queue: analysisQueue }
+    { name: 'analysis', queue: analysisQueue },
+    { name: 'headlines', queue: headlinesQueue },
+    { name: 'scoring', queue: scoringQueue },
   ];
   
   for (const { name, queue } of queues) {
@@ -399,6 +505,8 @@ module.exports = {
   flightQueue,
   newsQueue,
   analysisQueue,
+  headlinesQueue,
+  scoringQueue,
   scheduleJobs,
   getQueueStats
 };

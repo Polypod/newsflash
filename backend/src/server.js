@@ -26,7 +26,7 @@ async function startServer() {
     logger.info('WebSocket handler initialized');
 
     // Start background job queues
-    scheduleJobs();
+    scheduleJobs(socketHandler);
     logger.info('Background job queues started');
 
     // Start server
