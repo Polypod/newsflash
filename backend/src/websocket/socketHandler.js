@@ -88,6 +88,19 @@ class SocketHandler {
       data
     });
   }
+
+  broadcastNewsflash(article) {
+    this.io.to('news').emit('newsflash', {
+      id: article.id,
+      title: article.title,
+      source: article.source,
+      url: article.url,
+      criticality_score: article.criticality_score,
+      criticality_reason: article.criticality_reason,
+      published_at: article.published_at,
+      timestamp: new Date().toISOString(),
+    });
+  }
 }
 
 module.exports = SocketHandler;
