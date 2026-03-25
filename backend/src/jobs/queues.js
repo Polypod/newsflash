@@ -457,14 +457,16 @@ const scheduleJobs = (socketHandler) => {
     removeOnFail: 50
   });
 
-  // NewsAPI top-headlines: every 15 min
-  headlinesQueue.add({}, {
-    repeat: { every: 15 * 60 * 1000 },
-    removeOnComplete: 100,
-    removeOnFail: 50,
-  });
-  // Startup run (populate immediately)
-  headlinesQueue.add({ startup: true }, { delay: 5_000 });
+  if (config.newsApiEnabled) {
+    // NewsAPI top-headlines: every 15 min
+    headlinesQueue.add({}, {
+      repeat: { every: 15 * 60 * 1000 },
+      removeOnComplete: 100,
+      removeOnFail: 50,
+    });
+    // Startup run (populate immediately)
+    headlinesQueue.add({ startup: true }, { delay: 5_000 });
+  }
 
   logger.info('Recurring jobs scheduled');
 };
