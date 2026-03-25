@@ -19,6 +19,7 @@ function getCriticalityLabel(score) {
 function timeAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
   if (mins < 60) return `${mins}m ago`;
   return `${Math.floor(mins / 60)}h ago`;
 }
@@ -65,6 +66,7 @@ export default function News() {
 
   const fetchHeadlines = useCallback(async () => {
     setIsLoading(true);
+    setArticles([]);
     try {
       const res = await fetch(`/api/v1/news/headlines?level=${level}&limit=50`);
       if (!res.ok) throw new Error('Fetch failed');
@@ -89,9 +91,9 @@ export default function News() {
     : articles;
 
   const sections = [
-    { key: 'critical', label: 'CRITICAL', min: 85, cls: 'border-red-500 bg-red-50' },
-    { key: 'high',     label: 'HIGH',     min: 65, max: 84, cls: 'border-orange-400 bg-orange-50' },
-    { key: 'medium',   label: 'MEDIUM',   min: 40, max: 64, cls: 'border-gray-300 bg-gray-50' },
+    { key: 'critical', label: 'CRITICAL', min: 85 },
+    { key: 'high',     label: 'HIGH',     min: 65, max: 84 },
+    { key: 'medium',   label: 'MEDIUM',   min: 40, max: 64 },
   ];
 
   const inSection = (a, s) => {

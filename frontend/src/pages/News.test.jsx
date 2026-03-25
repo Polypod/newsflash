@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import News from './News';
 
@@ -21,8 +21,11 @@ describe('News page', () => {
   });
 
   it('renders page heading', async () => {
-    render(<MemoryRouter><News /></MemoryRouter>);
+    const { unmount } = render(<MemoryRouter><News /></MemoryRouter>);
     expect(screen.getByText(/live headlines/i)).toBeTruthy();
+    // Wait for initial fetch to complete to avoid act() warnings
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    unmount();
   });
 
   it('renders article titles after fetch', async () => {
