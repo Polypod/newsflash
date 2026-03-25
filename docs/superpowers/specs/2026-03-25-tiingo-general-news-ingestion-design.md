@@ -1,0 +1,215 @@
+# Tiingo General News Ingestion — Design Spec
+
+## Goal
+
+Add Tiingo as a general news source that supplements (not replaces) NewsAPI, feeding articles through the same backend scoring and broadcast pipeline. Both sources are independently toggleable via environment variables.
+
+## Architecture
+
+```
+AI service scheduler (every 15 min, configurable)
+  tiingo_scheduler.py
+    → tiingo_ingest.py: fetch_tiingo_news(tags, limit)
+    → POST /api/v1/ingest/articles (X-Internal-Key auth)
+
+Backend ingest endpoint (new)
+  → upsert news_articles (source_type='tiingo', external_id='tiingo-{id}')
+  → enqueue new IDs to scoringQueue
+
+scoringQueue (unchanged)
+  → Claude Haiku scores → update DB → newsflash broadcast if score ≥ 85
+```
+
+## Tech Stack
+
+- **AI service**: Python, APScheduler, existing `tiingo.py` HTTP client, `httpx`
+- **Backend**: Node.js, Express, Bull, existing `pg` pool + `scoringQueue`
+- **Config**: `ai-service/settings.yaml` (Tiingo tags + poll interval), `backend/.env` (NewsAPI toggle)
+
+---
+
+## Components
+
+### 1. `ai-service/settings.yaml` — new `tiingo.general_news` section
+
+```yaml
+tiingo:
+  news_limit: 10        # existing — used by financial_news_agent
+  max_tickers: 10       # existing
+
+  general_news:
+    enabled: true                    # override: TIINGO_NEWS_ENABLED=false
+    poll_interval_minutes: 15        # override: TIINGO_NEWS_POLL_INTERVAL=N
+    limit: 50                        # articles per poll
+    tags:
+      - geopolitics
+      - conflict
+      - war
+      - energy
+      - sanctions
+      - defense
+      - oil
+      - natural-gas
+      - government
+      - politics
+```
+
+### 2. `ai-service/src/config/settings.py` — typed config
+
+Add `GeneralNewsSettings` dataclass with `enabled`, `poll_interval_minutes`, `limit`, `tags`. Env overrides: `TIINGO_NEWS_ENABLED` (bool), `TIINGO_NEWS_POLL_INTERVAL` (int), `TIINGO_NEWS_TAGS` (comma-separated string).
+
+### 3. `ai-service/src/services/tiingo_ingest.py` — new service
+
+Responsibilities:
+- Call existing `fetch_tiingo_news(tickers=[], tags=cfg.tags, limit=cfg.limit, api_key=...)`
+- Transform each article to backend ingest shape:
+  ```python
+  {
+    "external_id": f"tiingo-{article['id']}",
+    "title": article["title"],
+    "content": article["description"],   # truncated to 500 chars
+    "url": article["url"],
+    "published_at": article["published_date"],
+    "source": article["source"],
+    "category": article["tags"][0] if article["tags"] else None,
+    "author": None,
+    "source_type": "tiingo",
+  }
+  ```
+- POST to `{BACKEND_URL}/api/v1/ingest/articles` with `X-Internal-Key` header
+- Returns `(inserted, skipped)` counts
+- Error handling: any exception → log warning, return `(0, 0)`, do not crash
+
+**Guard:** if `TIINGO_API_KEY` is not set, log error at startup and skip scheduling entirely.
+
+### 4. `ai-service/src/scheduler.py` — new APScheduler module
+
+```python
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+scheduler = AsyncIOScheduler()
+
+async def start_scheduler(settings, tiingo_api_key, backend_url, internal_key):
+    if settings.tiingo.general_news.enabled and tiingo_api_key:
+        scheduler.add_job(
+            run_tiingo_ingest,
+            "interval",
+            minutes=settings.tiingo.general_news.poll_interval_minutes,
+            args=[settings, tiingo_api_key, backend_url, internal_key],
+        )
+        scheduler.start()
+```
+
+Runs an initial fetch at startup (trigger="date", run_date=now+5s) so articles appear immediately without waiting 15 min.
+
+### 5. `ai-service/src/main.py` — startup hook
+
+Add `@app.on_event("startup")` that calls `start_scheduler(...)`. Add `@app.on_event("shutdown")` that calls `scheduler.shutdown()`.
+
+### 6. `backend/src/routes/v1/ingest.js` — new route
+
+`POST /api/v1/ingest/articles`
+- Auth: `X-Internal-Key` header checked against `config.internalApiKey`
+- Body: `{ articles: Article[] }` (max 100 per request)
+- Logic:
+  1. For each article, upsert: `INSERT INTO news_articles (...) ON CONFLICT (external_id) DO NOTHING RETURNING id`
+  2. Collect returned IDs (new inserts only)
+  3. Enqueue each to `scoringQueue`
+  4. Return `{ inserted: N, skipped: M }`
+- Errors: 401 missing/wrong key, 400 missing articles array, 500 DB error
+
+### 7. `backend/src/app.js` — register route
+
+```js
+app.use('/api/v1/ingest', require('./routes/v1/ingest'));
+```
+
+### 8. `backend/src/jobs/queues.js` — NewsAPI toggle
+
+Wrap `headlinesQueue` scheduling with:
+```js
+if (config.newsApiEnabled !== false) {
+  headlinesQueue.add({}, { repeat: { cron: '*/15 * * * *' }, ...});
+}
+```
+
+### 9. `backend/src/config/env.js` — new flag
+
+```js
+newsApiEnabled: process.env.NEWSAPI_ENABLED !== 'false',  // default true
+```
+
+### 10. `backend/src/routes/v1/news.js` — headlines filter update
+
+Replace:
+```sql
+WHERE source_type = 'newsapi-top'
+```
+With:
+```sql
+WHERE source_type IN ('newsapi-top', 'tiingo')
+```
+
+---
+
+## Data Flow Detail
+
+```
+Tiingo article id=12345, tag="energy"
+  → external_id = "tiingo-12345"
+  → POST /api/v1/ingest/articles
+  → INSERT ... ON CONFLICT (external_id) DO NOTHING RETURNING id
+  → [new] → scoringQueue.add({ articleId: uuid })
+  → Claude Haiku: score=72, reason="Energy supply disruption..."
+  → UPDATE news_articles SET criticality_score=72 ...
+  → score < 85 → no newsflash broadcast
+  → appears on /news page under HIGH section
+```
+
+---
+
+## Error Handling
+
+| Scenario | Behaviour |
+|----------|-----------|
+| Tiingo API down | Log warn, skip cycle, retry next interval |
+| Backend POST fails (503/timeout) | Log warn, skip cycle — articles re-fetched next poll, deduped by external_id |
+| `TIINGO_API_KEY` missing | Log error at startup, scheduler not started |
+| `TIINGO_NEWS_ENABLED=false` | Scheduler not started, no fetches |
+| `NEWSAPI_ENABLED=false` | headlinesQueue not scheduled |
+| Duplicate article | `ON CONFLICT DO NOTHING` — silent skip |
+
+---
+
+## Testing
+
+### Backend (`jest`)
+- `tests/routes/ingest.test.js`:
+  - `POST /ingest/articles` with valid key → 200, inserts new, skips duplicates
+  - `POST /ingest/articles` with wrong key → 401
+  - `POST /ingest/articles` with missing array → 400
+- `tests/routes/headlines.test.js`: update `source_type` filter test to match `IN ('newsapi-top', 'tiingo')`
+- `tests/jobs/queues.test.js`: verify `NEWSAPI_ENABLED=false` skips headlinesQueue scheduling
+
+### AI service (`pytest`)
+- `tests/services/test_tiingo_ingest.py`:
+  - Transform produces correct `external_id`, `source_type`, truncated content
+  - POST called with correct headers and body
+  - Returns `(0, 0)` on HTTP error without raising
+  - Missing `TIINGO_API_KEY` → scheduler skips, no crash
+
+---
+
+## Dependencies
+
+- `apscheduler` — add to `ai-service/requirements.txt`
+- No new backend npm packages required
+
+---
+
+## Out of Scope
+
+- Chroma indexing (articles embedded into vector store) — separate initiative
+- Financial signals / ticker analysis — Sub-project B
+- UI changes to the `/news` page — existing page already handles multiple source types
+- Tiingo as a source in `settings.yaml` for the financial_news_agent (Node 6) — already works independently
