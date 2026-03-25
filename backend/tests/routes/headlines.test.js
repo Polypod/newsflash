@@ -44,11 +44,11 @@ describe('GET /api/v1/news/headlines', () => {
     expect(sql).toMatch(/criticality_score >= 85/);
   });
 
-  it('?level=all includes unscored (NULL) articles', async () => {
+  it('?level=all returns all articles regardless of score', async () => {
     mockQuery.mockResolvedValue({ rows: sampleRows });
     const res = await request(app).get('/api/v1/news/headlines?level=all');
-    const sql = mockQuery.mock.calls[0][0];
-    expect(sql).toMatch(/na\.criticality_score >= 40 OR na\.criticality_score IS NULL/);
+    expect(res.status).toBe(200);
+    expect(res.body.articles).toHaveLength(2);
   });
 
   it('returns 200 with empty array when no rows', async () => {

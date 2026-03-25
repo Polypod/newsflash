@@ -102,7 +102,7 @@ export default function News() {
     return a.criticality_score >= s.min;
   };
 
-  const unscored = filtered.filter((a) => a.criticality_score === null);
+  const unscored = filtered.filter((a) => a.criticality_score === null || a.criticality_score < 40);
 
   return (
     <DashboardContainer>
