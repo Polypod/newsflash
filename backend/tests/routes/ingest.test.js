@@ -96,4 +96,19 @@ describe('POST /api/v1/ingest/articles', () => {
 
     expect(res.status).toBe(400);
   });
+
+  it('skips articles with DB errors and continues processing remaining articles', async () => {
+    mockQuery
+      .mockRejectedValueOnce(new Error('DB connection lost'))
+      .mockResolvedValueOnce({ rows: [{ id: 'uuid-2' }] });
+
+    const res = await request(app)
+      .post('/api/v1/ingest/articles')
+      .set('X-Internal-Key', VALID_KEY)
+      .send({ articles: [sampleArticle, { ...sampleArticle, external_id: 'tiingo-99999' }] });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ inserted: 1, skipped: 1 });
+    expect(mockQueueAdd).toHaveBeenCalledTimes(1);
+  });
 });
