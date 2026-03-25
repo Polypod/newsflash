@@ -26,7 +26,7 @@ describe('WebSocket auth', () => {
   });
 
   afterAll((done) => {
-    httpServer.close(done);
+    handler.io.close(done);
   });
 
   it('disconnects client with no token', (done) => {
@@ -67,7 +67,7 @@ describe('broadcastNewsflash', () => {
   });
 
   afterAll((done) => {
-    httpServer.close(done);
+    handler.io.close(done);
   });
 
   it('broadcasts newsflash event to news room with all expected fields', (done) => {
