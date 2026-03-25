@@ -65,4 +65,43 @@ router.get('/trending', async (req, res, next) => {
   }
 });
 
+const LEVEL_FILTERS = {
+  critical: 'na.criticality_score >= 85',
+  high:     'na.criticality_score BETWEEN 65 AND 84',
+  medium:   'na.criticality_score BETWEEN 40 AND 64',
+  all:      '(criticality_score >= 40 OR criticality_score IS NULL)',
+};
+
+// GET /api/v1/news/headlines
+router.get('/headlines', async (req, res, next) => {
+  try {
+    const { level = 'all', limit = 50 } = req.query;
+    const redisClient = getRedisClient();
+    const pool = getDbPool();
+
+    const cacheKey = `news:headlines:${level}`;
+    const cached = await redisClient.get(cacheKey);
+    if (cached) return res.json(JSON.parse(cached));
+
+    const scoreFilter = LEVEL_FILTERS[level] || LEVEL_FILTERS.all;
+    const query = `
+      SELECT id, source, title, content, url, published_at,
+             criticality_score, criticality_reason, source_type
+      FROM news_articles na
+      WHERE source_type = 'newsapi-top'
+        AND ${scoreFilter}
+      ORDER BY COALESCE(criticality_score, 0) DESC, published_at DESC
+      LIMIT $1
+    `;
+    const result = await pool.query(query, [parseInt(limit, 10)]);
+    const response = { articles: result.rows };
+
+    await redisClient.setEx(cacheKey, 60, JSON.stringify(response));
+    res.json(response);
+  } catch (error) {
+    logger.error('Error fetching headlines:', error);
+    next(error);
+  }
+});
+
 module.exports = router;
