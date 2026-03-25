@@ -185,7 +185,7 @@ def test_classify_category_no_api_key_returns_none():
     """OPENAI_API_KEY absent → intersection missed, returns None without LLM call."""
     from services.tiingo_ingest import _classify_category
 
-    with patch("os.getenv", return_value=None):
+    with patch("services.tiingo_ingest.os.getenv", return_value=None):
         with patch("services.tiingo_ingest.OpenAI") as MockOpenAI:
             result = _classify_category(
                 "NATO summit", "Alliance leaders meet.", ["nato"], ["energy", "geopolitics"]
