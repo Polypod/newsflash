@@ -85,9 +85,11 @@ def test_ingest_skips_articles_with_empty_id():
     bad_articles = [{**SAMPLE_ARTICLES[0], "id": ""}]
 
     with patch("services.tiingo_ingest.fetch_tiingo_news", return_value=bad_articles):
-        result = ingest(_make_tiingo_cfg(), "api-key", "http://backend:3000", "key")
+        with patch("httpx.Client") as MockClient:
+            result = ingest(_make_tiingo_cfg(), "api-key", "http://backend:3000", "key")
+            MockClient.return_value.__enter__.return_value.post.assert_not_called()
 
-    assert result == (0, 0)   # no POST made, no error raised
+    assert result == (0, 0)
 
 
 def test_ingest_returns_zero_zero_on_http_error():
