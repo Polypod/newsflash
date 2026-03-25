@@ -2,11 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, act } from '@testing-library/react';
 import { useContext } from 'react';
 
-const { mockSubscribe, mockOn, mockOff, mockConnect } = vi.hoisted(() => ({
+const { mockSubscribe, mockOn, mockOff, mockConnect, mockUnsubscribe } = vi.hoisted(() => ({
   mockSubscribe: vi.fn(),
   mockOn: vi.fn(),
   mockOff: vi.fn(),
   mockConnect: vi.fn().mockResolvedValue(),
+  mockUnsubscribe: vi.fn(),
 }));
 
 // Mock localStorage
@@ -26,6 +27,7 @@ vi.mock('../services/wsService', () => ({
   default: {
     connect: mockConnect,
     subscribe: mockSubscribe,
+    unsubscribe: mockUnsubscribe,
     on: mockOn,
     off: mockOff,
     isConnected: true,

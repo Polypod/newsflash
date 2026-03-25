@@ -27,6 +27,7 @@ export function NewsflashProvider({ children }) {
     wsService.on('newsflash', handleNewsflash);
     return () => {
       wsService.off('newsflash', handleNewsflash);
+      wsService.unsubscribe('news');
     };
   }, []);
 
