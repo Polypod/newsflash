@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 def _classify_category(
     title: str,
     description: str,
-    article_tags: list,
-    taxonomy: list,
+    article_tags: list[str],
+    taxonomy: list[str],
 ) -> str | None:
     """Return the best-matching taxonomy tag for an article.
 
@@ -48,7 +48,7 @@ def _classify_category(
         prompt = (
             f"Classify the following news article into exactly one of these categories: {tag_list}.\n"
             f"Reply with just the category name, nothing else.\n\n"
-            f"Title: {title}\n"
+            f"Title: {(title or '')}\n"
             f"Summary: {(description or '')[:200]}"
         )
         resp = client.chat.completions.create(
