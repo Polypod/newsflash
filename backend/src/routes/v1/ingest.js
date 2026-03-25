@@ -48,8 +48,8 @@ router.post('/articles', async (req, res, next) => {
         skipped++;
       }
     } catch (err) {
-      logger.error('ingest: DB error', { external_id: a.external_id, err: err.message });
-      return next(err);
+      logger.error('ingest: DB error for article, skipping', { external_id: a.external_id, err: err.message });
+      skipped++;
     }
   }
 
