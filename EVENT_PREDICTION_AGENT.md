@@ -1,3 +1,6 @@
+1. We have threat assesment already - verify this is working
+2. We would also like to enhance the results throug event prediction (similar to what is done at ACLED) - see below:
+
 ┌─────────────────────────────────────────────────────────────┐
 │                    EVENT PREDICTION AGENT                    │
 ├─────────────────────────────────────────────────────────────┤
@@ -73,3 +76,30 @@ async def predict_event_risk(
         EventPredictionResult with risk_score, confidence, 
         contributing_signals, and reasoning_chain
     """
+
+
+from the project exploration:
+
+Threat assessment — already built and substantial. The existing 7-node LangGraph pipeline already covers:
+
+News aggregation (Chroma semantic search)
+Geopolitical event extraction (Claude)
+UCDP verified conflict data (PostGIS DB queries)
+Infrastructure risk (spatial 200km radius)
+ACLED CAST rolling violence forecasts (6 upcoming 4-week periods)
+Financial signals (Tiingo + LLM-selected tickers)
+Threat synthesis (Claude → low/medium/high/critical)
+So "verify it's working" means running it end-to-end and checking the output quality, not building from scratch.
+
+Event prediction — the new part. The CAST forecasts are already forward-looking, but the spec describes a richer dedicated prediction layer: explicit risk scores (0-100), confidence intervals, causal chains, multiple time horizons (7/30/90 days), and specific event-type targeting.
+
+First clarifying question: The CAST forecasts in the existing workflow already give rolling 4-week violence predictions per country. What should the new event prediction agent add that CAST doesn't already cover?
+
+a) A unified risk score (0-100) synthesized across all signals (CAST + UCDP trends + news + financial) with confidence intervals
+
+b) Specific event-type predictions ("military escalation", "coup", "humanitarian crisis") rather than generic violence counts
+
+c) Longer time horizons (30/90 days) with causal reasoning chains explaining why an event might occur
+
+d) All of the above — treat CAST as one input signal among many, build a full reasoning layer on top
+

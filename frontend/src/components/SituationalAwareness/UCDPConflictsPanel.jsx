@@ -14,12 +14,13 @@ const INTENSITY_META = {
 };
 
 function DeathBar({ best, low, high }) {
-  if (!best && !low && !high) return <span className="text-gray-400 text-xs">unknown</span>;
+  if (best == null && low == null && high == null) return <span className="text-gray-400 text-xs">unknown</span>;
+  const fmt = (n) => (n ?? 0).toLocaleString();
   return (
     <span className="text-xs font-medium text-gray-700">
-      {best.toLocaleString()}
+      {fmt(best)}
       {(low !== best || high !== best) && (
-        <span className="text-gray-400 font-normal"> ({low.toLocaleString()}–{high.toLocaleString()})</span>
+        <span className="text-gray-400 font-normal"> ({fmt(low)}–{fmt(high)})</span>
       )}
     </span>
   );
