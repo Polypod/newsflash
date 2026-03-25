@@ -75,15 +75,18 @@ const LEVEL_FILTERS = {
 // GET /api/v1/news/headlines
 router.get('/headlines', async (req, res, next) => {
   try {
-    const { level = 'all', limit = 50 } = req.query;
+    const { level: rawLevel = 'all', limit = 50 } = req.query;
     const redisClient = getRedisClient();
     const pool = getDbPool();
+
+    const VALID_LEVELS = new Set(['critical', 'high', 'medium', 'all']);
+    const level = VALID_LEVELS.has(rawLevel) ? rawLevel : 'all';
 
     const cacheKey = `news:headlines:${level}`;
     const cached = await redisClient.get(cacheKey);
     if (cached) return res.json(JSON.parse(cached));
 
-    const scoreFilter = LEVEL_FILTERS[level] || LEVEL_FILTERS.all;
+    const scoreFilter = LEVEL_FILTERS[level];
     const query = `
       SELECT id, source, title, content, url, published_at,
              criticality_score, criticality_reason, source_type

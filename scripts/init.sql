@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS news_articles (
   relevance_score NUMERIC(3, 2),
   threat_indicators TEXT[],
   url VARCHAR(500),
+  category VARCHAR(50),
+  author VARCHAR(255),
   criticality_score INTEGER DEFAULT NULL,
   criticality_reason TEXT DEFAULT NULL,
   source_type VARCHAR(50) DEFAULT 'rss',
