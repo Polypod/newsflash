@@ -55,7 +55,7 @@ def test_ingest_transforms_article_to_correct_shape():
     assert article["external_id"] == "tiingo-12345"
     assert article["source_type"] == "tiingo"
     assert article["author"] is None
-    assert article["category"] == "energy"   # first tag
+    assert article["category"] == "energy"   # intersection match
     assert article["content"] == "Brent crude rises sharply."
 
 
@@ -114,3 +114,87 @@ def test_ingest_returns_zero_zero_when_no_articles():
             MockClient.return_value.__enter__.return_value.post.assert_not_called()
 
     assert result == (0, 0)
+
+
+# ── _classify_category tests ─────────────────────────────────────────────────
+
+def test_classify_category_intersection_hit():
+    """Article tag found in taxonomy → return it lowercase, no LLM call."""
+    from services.tiingo_ingest import _classify_category
+
+    result = _classify_category(
+        "Oil surges", "Brent crude rises sharply.", ["Energy", "Oil"], ["energy", "geopolitics"]
+    )
+    assert result == "energy"
+
+
+def test_classify_category_llm_success():
+    """No intersection match, LLM returns valid taxonomy tag → returned."""
+    from services.tiingo_ingest import _classify_category
+
+    mock_resp = MagicMock()
+    mock_resp.choices[0].message.content = "geopolitics"
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_resp
+
+    with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
+        with patch("openai.OpenAI", return_value=mock_client):
+            result = _classify_category(
+                "NATO summit", "Alliance leaders meet.", ["nato", "diplomacy"], ["energy", "geopolitics"]
+            )
+
+    assert result == "geopolitics"
+    mock_client.chat.completions.create.assert_called_once()
+
+
+def test_classify_category_llm_out_of_taxonomy():
+    """LLM returns a string not in the taxonomy → None."""
+    from services.tiingo_ingest import _classify_category
+
+    mock_resp = MagicMock()
+    mock_resp.choices[0].message.content = "sports"
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_resp
+
+    with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
+        with patch("openai.OpenAI", return_value=mock_client):
+            result = _classify_category(
+                "Some article", "Some description.", ["xyz"], ["energy", "geopolitics"]
+            )
+
+    assert result is None
+
+
+def test_classify_category_llm_exception():
+    """LLM call raises an exception → returns None, no crash."""
+    from services.tiingo_ingest import _classify_category
+
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.side_effect = Exception("quota exceeded")
+
+    with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
+        with patch("openai.OpenAI", return_value=mock_client):
+            result = _classify_category(
+                "Some article", "Some description.", ["xyz"], ["energy", "geopolitics"]
+            )
+
+    assert result is None
+
+
+def test_classify_category_empty_tags():
+    """Empty article_tags list → intersection skipped, LLM fallback fires."""
+    from services.tiingo_ingest import _classify_category
+
+    mock_resp = MagicMock()
+    mock_resp.choices[0].message.content = "energy"
+    mock_client = MagicMock()
+    mock_client.chat.completions.create.return_value = mock_resp
+
+    with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
+        with patch("openai.OpenAI", return_value=mock_client):
+            result = _classify_category(
+                "Oil rises", "Crude surges.", [], ["energy", "geopolitics"]
+            )
+
+    assert result == "energy"
+    mock_client.chat.completions.create.assert_called_once()

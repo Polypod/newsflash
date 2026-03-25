@@ -4,12 +4,66 @@ This module is designed to run inside asyncio.to_thread(), so it uses
 synchronous httpx.Client — do NOT use httpx.AsyncClient here.
 """
 import logging
+import os
 
 import httpx
 
 from services.tiingo import fetch_tiingo_news
 
 logger = logging.getLogger(__name__)
+
+
+def _classify_category(
+    title: str,
+    description: str,
+    article_tags: list,
+    taxonomy: list,
+) -> str | None:
+    """Return the best-matching taxonomy tag for an article.
+
+    Step 1: intersection — return the first of the article's own Tiingo tags
+    that appears in the taxonomy list (case-insensitive). No network call.
+
+    Step 2: LLM fallback — if no intersection found, call GPT-4o-mini at
+    temperature=0.0 to pick one taxonomy tag from title + description.
+    Validates the response is in the taxonomy before returning.
+
+    Returns None on any failure. Never raises.
+    """
+    taxonomy_set = {t.lower() for t in taxonomy}
+
+    # Step 1: intersection — canonical form is always lowercase
+    for tag in article_tags:
+        if tag.lower() in taxonomy_set:
+            return tag.lower()
+
+    # Step 2: LLM fallback
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    if not openai_api_key:
+        return None
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=openai_api_key)
+        tag_list = ", ".join(taxonomy)
+        prompt = (
+            f"Classify the following news article into exactly one of these categories: {tag_list}.\n"
+            f"Reply with just the category name, nothing else.\n\n"
+            f"Title: {title}\n"
+            f"Summary: {(description or '')[:200]}"
+        )
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            temperature=0.0,
+            max_tokens=20,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        result = resp.choices[0].message.content.strip().lower()
+        if result in taxonomy_set:
+            return result
+        return None
+    except Exception as exc:
+        logger.warning("category LLM fallback failed: %s", exc)
+        return None
 
 
 def ingest(tiingo_cfg, tiingo_api_key: str, backend_url: str, internal_key: str) -> tuple:
@@ -39,7 +93,12 @@ def ingest(tiingo_cfg, tiingo_api_key: str, backend_url: str, internal_key: str)
                 "url": article["url"],
                 "published_at": article["published_date"],
                 "source": article["source"],
-                "category": article["tags"][0][:50] if article["tags"] else None,
+                "category": _classify_category(
+                    article["title"],
+                    article["description"],
+                    article["tags"],
+                    tiingo_cfg.general_news.tags,
+                ),
                 "author": None,
                 "source_type": "tiingo",
             })
