@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -6,10 +8,26 @@ import os
 from dotenv import load_dotenv
 
 from config.api_key import require_internal_key
+from config.settings import tiingo as tiingo_settings
+from scheduler import scheduler, start_scheduler
 
 load_dotenv()
 
-app = FastAPI(title="Situational Awareness AI Service", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start Tiingo scheduler on startup; shut it down on shutdown."""
+    tiingo_api_key = os.getenv("TIINGO_API_KEY")
+    backend_url = os.getenv("BACKEND_URL", "http://localhost:3000")
+    internal_key = os.getenv("INTERNAL_API_KEY")
+    await start_scheduler(tiingo_settings, tiingo_api_key, backend_url, internal_key)
+    yield
+    if scheduler.running:   # guard: only shut down if scheduler.start() was called
+        scheduler.shutdown()
+
+
+# lifespan must be defined above before this line
+app = FastAPI(title="Situational Awareness AI Service", version="1.0.0", lifespan=lifespan)
 
 # CORS: explicit origin, no wildcard when credentials are used
 _frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
