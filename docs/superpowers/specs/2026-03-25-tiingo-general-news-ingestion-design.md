@@ -99,11 +99,14 @@ class _Tiingo:
 
 ### 3. `ai-service/src/services/tiingo_ingest.py` — new service
 
+Expose one public function `ingest(tiingo_cfg, tiingo_api_key, backend_url, internal_key) -> tuple[int, int]` — this is the synchronous function that `scheduler.py` passes to `asyncio.to_thread`.
+
 Responsibilities:
 
-- Call existing `fetch_tiingo_news(tickers=[], tags=cfg.tags, limit=cfg.limit, api_key=...)`
+- Call existing `fetch_tiingo_news(tickers=[], tags=tiingo_cfg.general_news.tags, limit=tiingo_cfg.general_news.limit, api_key=tiingo_api_key)`
   - Note: `tiingo.py` already truncates `description` to 500 chars — no additional truncation needed
-- Transform each article to backend ingest shape:
+- Skip any article where `article['id'] == ""` (tiingo.py coerces missing ids to empty string; a blank `external_id` of `"tiingo-"` would collide across all such articles)
+- Transform each remaining article to backend ingest shape:
 
   ```python
   {
@@ -119,7 +122,7 @@ Responsibilities:
   }
   ```
 
-- POST to `{BACKEND_URL}/api/v1/ingest/articles` with `X-Internal-Key` header
+- POST to `{backend_url}/api/v1/ingest/articles` with `X-Internal-Key` header using a **synchronous** `httpx.Client` (consistent with `tiingo.py` — do not use `httpx.AsyncClient` here, as this function runs inside `asyncio.to_thread`)
 - Returns `(inserted, skipped)` counts
 - Error handling: any exception → log warning, return `(0, 0)`, do not crash
 
@@ -134,11 +137,12 @@ The scheduler receives the `_Tiingo` instance (imported as `tiingo` from `config
 ```python
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import asyncio
+from services.tiingo_ingest import ingest as _sync_ingest  # sync function, runs in thread
 
 scheduler = AsyncIOScheduler()
 
 async def run_tiingo_ingest(tiingo_cfg, tiingo_api_key, backend_url, internal_key):
-    # fetch_tiingo_news is sync — run in thread to avoid blocking the event loop
+    # tiingo_ingest.ingest is sync (uses httpx.Client) — run in thread pool
     inserted, skipped = await asyncio.to_thread(
         _sync_ingest, tiingo_cfg, tiingo_api_key, backend_url, internal_key
     )
@@ -180,7 +184,8 @@ async def lifespan(app: FastAPI):
     internal_key = os.getenv("INTERNAL_API_KEY")
     await start_scheduler(tiingo_settings, tiingo_api_key, backend_url, internal_key)
     yield
-    scheduler.shutdown()
+    if scheduler.running:  # guard: scheduler.start() is only called when conditions are met
+        scheduler.shutdown()
 
 # lifespan must be defined above before this line
 app = FastAPI(title="Situational Awareness AI Service", version="1.0.0", lifespan=lifespan)
@@ -190,7 +195,7 @@ app = FastAPI(title="Situational Awareness AI Service", version="1.0.0", lifespa
 
 `POST /api/v1/ingest/articles`
 
-- Auth: `X-Internal-Key` header checked against `config.internalApiKey`
+- Auth: `X-Internal-Key` header checked against `config.internalApiKey`. If `INTERNAL_API_KEY` is not set in env, `config.internalApiKey` is `undefined` — the route handler must treat a missing/undefined server key as a misconfiguration and return 503 (not 401), to avoid accidentally authenticating all requests via `undefined === undefined`.
 - Body: `{ articles: Article[] }` (max 100 per request)
 - JSON body limit: `express.json({ limit: '1mb' })` applied to this router — 50 articles × ~1 KB each could exceed the default 10 KB body limit
 - Logic:
@@ -217,7 +222,7 @@ The ingest route does not require JWT authentication — it uses `X-Internal-Key
 Wrap **both** `headlinesQueue.add()` calls inside one guard — the cron-repeat job and the startup delay job must both be skipped:
 
 ```js
-if (config.newsApiEnabled !== false) {
+if (config.newsApiEnabled) {  // always a boolean per env.js — no need for !== false
   // NewsAPI top-headlines: every 15 min
   headlinesQueue.add({}, {
     repeat: { every: 15 * 60 * 1000 },
