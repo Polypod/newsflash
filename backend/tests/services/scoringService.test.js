@@ -10,6 +10,8 @@ process.env.ANTHROPIC_API_KEY = 'test-key';
 const { scoreHeadline } = require('../../src/services/scoringService');
 
 describe('scoreHeadline', () => {
+  beforeEach(() => { mockCreate.mockReset(); });
+
   it('returns score and reason from tool use response', async () => {
     mockCreate.mockResolvedValue({
       content: [{

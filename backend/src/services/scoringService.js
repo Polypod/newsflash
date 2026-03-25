@@ -1,5 +1,14 @@
 const Anthropic = require('@anthropic-ai/sdk');
+const config = require('../config/env');
 const logger = require('../utils/logger');
+
+let _client = null;
+function getClient() {
+  if (!_client) {
+    _client = new Anthropic({ apiKey: config.anthropicApiKey });
+  }
+  return _client;
+}
 
 const SCORE_TOOL = {
   name: 'score_headline',
@@ -32,14 +41,13 @@ Title: ${title}
 Description: ${description || '(none)'}`;
 
 async function scoreHeadline(title, description) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  if (!config.anthropicApiKey) {
     logger.warn('ANTHROPIC_API_KEY not set — skipping headline scoring');
     return { score: null, reason: null };
   }
 
   try {
-    const client = new Anthropic({ apiKey });
+    const client = getClient();
     const response = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 150,
