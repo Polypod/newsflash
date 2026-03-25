@@ -44,10 +44,10 @@ def _classify_category(
     """
     taxonomy_set = {t.lower() for t in taxonomy}
 
-    # Step 1: intersection
+    # Step 1: intersection — return lowercase for consistent storage
     for tag in article_tags:
         if tag.lower() in taxonomy_set:
-            return tag.lower()
+            return tag.lower()  # canonical form is always lowercase
 
     # Step 2: LLM fallback
     openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -61,7 +61,7 @@ def _classify_category(
             f"Classify the following news article into exactly one of these categories: {tag_list}.\n"
             f"Reply with just the category name, nothing else.\n\n"
             f"Title: {title}\n"
-            f"Summary: {description[:200]}"
+            f"Summary: {(description or '')[:200]}"
         )
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -93,18 +93,19 @@ Replace the current `category` field in `ingest()`:
 ),
 ```
 
-Note: `import os` is already present at module level. The `openai` package is already in `requirements.txt`.
+Add `import os` to the module-level imports (not currently present). The `openai` package is already in `requirements.txt`.
 
 ### `ai-service/tests/test_tiingo_ingest.py` — modified
 
-Add four tests for `_classify_category` directly:
+Add five tests for `_classify_category` directly:
 
-1. **Intersection hit** — article tag in taxonomy → returns matched tag, no OpenAI call
+1. **Intersection hit** — article tag in taxonomy → returns lowercase matched tag, no OpenAI call
 2. **Intersection miss → LLM success** — no matching tag, LLM returns valid taxonomy value → returned
 3. **LLM returns out-of-taxonomy string** → returns `None`
 4. **LLM raises exception** → returns `None`, no crash
+5. **Empty tags list** — `article_tags=[]` → intersection skipped, LLM fallback fires
 
-Update the existing `test_ingest_transforms_article_to_correct_shape` to use an article whose first tag IS in the taxonomy (so the intersection path is exercised and `category` is non-null).
+The existing `test_ingest_transforms_article_to_correct_shape` uses `SAMPLE_ARTICLES` with `tags: ["energy", "oil"]` and the default taxonomy includes `"energy"` — the intersection already fires and `category == "energy"` passes. **No fixture change needed.** Update only the stale inline comment on the assertion from `# first tag` to `# intersection match`.
 
 ## Data Flow
 
@@ -138,3 +139,4 @@ Tiingo article { tags: ["Mergers & Acquisitions", "Corporate Strategy"] }
 - Using Claude instead of GPT-4o-mini (extraction model is already GPT-4o-mini by convention)
 - Changing the `category` column type or length
 - Classifying articles from other sources (NewsAPI)
+- Caching or reusing the `OpenAI` client across calls (instantiated per-article on the LLM path; acceptable for the current batch size)
