@@ -39,7 +39,7 @@ def ingest(tiingo_cfg, tiingo_api_key: str, backend_url: str, internal_key: str)
                 "url": article["url"],
                 "published_at": article["published_date"],
                 "source": article["source"],
-                "category": article["tags"][0] if article["tags"] else None,
+                "category": article["tags"][0][:50] if article["tags"] else None,
                 "author": None,
                 "source_type": "tiingo",
             })
