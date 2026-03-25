@@ -122,10 +122,11 @@ def test_classify_category_intersection_hit():
     """Article tag found in taxonomy → return it lowercase, no LLM call."""
     from services.tiingo_ingest import _classify_category
 
-    with patch("services.tiingo_ingest.OpenAI") as MockOpenAI:
-        result = _classify_category(
-            "Oil surges", "Brent crude rises sharply.", ["Energy", "Oil"], ["energy", "geopolitics"]
-        )
+    with patch.dict("os.environ", {}, clear=True):
+        with patch("services.tiingo_ingest.OpenAI") as MockOpenAI:
+            result = _classify_category(
+                "Oil surges", "Brent crude rises sharply.", ["Energy", "Oil"], ["energy", "geopolitics"]
+            )
 
     assert result == "energy"
     MockOpenAI.assert_not_called()
@@ -188,7 +189,7 @@ def test_classify_category_no_api_key_returns_none():
     """OPENAI_API_KEY absent → intersection missed, returns None without LLM call."""
     from services.tiingo_ingest import _classify_category
 
-    with patch("services.tiingo_ingest.os.getenv", return_value=None):
+    with patch.dict("os.environ", {}, clear=True):
         with patch("services.tiingo_ingest.OpenAI") as MockOpenAI:
             result = _classify_category(
                 "NATO summit", "Alliance leaders meet.", ["nato"], ["energy", "geopolitics"]
