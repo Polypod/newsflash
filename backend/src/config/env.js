@@ -29,6 +29,12 @@ const config = {
     || process.env.AVIATIONSTACK_API,
   newsApiKey: process.env.NEWS_API_KEY,
 
+  // Internal service auth
+  internalApiKey: process.env.INTERNAL_API_KEY,
+
+  // Source toggles
+  newsApiEnabled: process.env.NEWSAPI_ENABLED !== 'false',  // default true
+
   // AI Services
   anthropicApiKey: process.env.ANTHROPIC_API_KEY,
   openaiApiKey: process.env.OPENAI_API_KEY                    // also accepts OPEN_API_KEY
