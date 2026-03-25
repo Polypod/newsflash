@@ -31,6 +31,9 @@ def _classify_category(
 
     Returns None on any failure. Never raises.
     """
+    if not taxonomy:
+        return None
+
     taxonomy_set = {t.lower() for t in taxonomy}
 
     # Step 1: intersection — canonical form is always lowercase
