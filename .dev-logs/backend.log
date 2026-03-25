@@ -7,13 +7,112 @@
 [33m[nodemon] watching path(s): *.*[39m
 [33m[nodemon] watching extensions: js,mjs,cjs,json[39m
 [32m[nodemon] starting `node src/server.js`[39m
-[32minfo[39m: Database connection established {"service":"situational-awareness-backend","timestamp":"2026-03-24 11:20:51"}
-[32minfo[39m: Database connected successfully {"service":"situational-awareness-backend","timestamp":"2026-03-24 11:20:51"}
-[32minfo[39m: Redis client connected {"service":"situational-awareness-backend","timestamp":"2026-03-24 11:20:51"}
-[32minfo[39m: Redis connected successfully {"service":"situational-awareness-backend","timestamp":"2026-03-24 11:20:51"}
-[32minfo[39m: WebSocket handler initialized {"service":"situational-awareness-backend","timestamp":"2026-03-24 11:20:51"}
-[32minfo[39m: Recurring jobs scheduled {"service":"situational-awareness-backend","timestamp":"2026-03-24 11:20:51"}
-[32minfo[39m: Background job queues started {"service":"situational-awareness-backend","timestamp":"2026-03-24 11:20:51"}
-[32minfo[39m: Server running on port 5174 {"service":"situational-awareness-backend","timestamp":"2026-03-24 11:20:51"}
-[32minfo[39m: API Documentation: http://localhost:5174/api-docs {"service":"situational-awareness-backend","timestamp":"2026-03-24 11:20:51"}
-[32minfo[39m: Health check: http://localhost:5174/health {"service":"situational-awareness-backend","timestamp":"2026-03-24 11:20:51"}
+[32minfo[39m: Database connection established {"service":"situational-awareness-backend","timestamp":"2026-03-25 21:58:38"}
+[32minfo[39m: Database connected successfully {"service":"situational-awareness-backend","timestamp":"2026-03-25 21:58:38"}
+[32minfo[39m: Redis client connected {"service":"situational-awareness-backend","timestamp":"2026-03-25 21:58:38"}
+[32minfo[39m: Redis connected successfully {"service":"situational-awareness-backend","timestamp":"2026-03-25 21:58:38"}
+[32minfo[39m: WebSocket handler initialized {"service":"situational-awareness-backend","timestamp":"2026-03-25 21:58:38"}
+[32minfo[39m: Recurring jobs scheduled {"service":"situational-awareness-backend","timestamp":"2026-03-25 21:58:38"}
+[32minfo[39m: Background job queues started {"service":"situational-awareness-backend","timestamp":"2026-03-25 21:58:38"}
+[32minfo[39m: Server running on port 3000 {"service":"situational-awareness-backend","timestamp":"2026-03-25 21:58:38"}
+[32minfo[39m: API Documentation: http://localhost:3000/api-docs {"service":"situational-awareness-backend","timestamp":"2026-03-25 21:58:38"}
+[32minfo[39m: Health check: http://localhost:3000/health {"service":"situational-awareness-backend","timestamp":"2026-03-25 21:58:38"}
+[0mGET /api/v1/news/headlines?level=all&limit=50 [36m304[0m 3.937 ms - -[0m
+[0mGET /api/v1/news/headlines?level=all&limit=50 [36m304[0m 1.867 ms - -[0m
+[0mPOST /api/v1/ingest/articles [32m200[0m 87.019 ms - 28[0m
+[32minfo[39m: news-scoring: article 70de7520-56b0-4771-87da-6e34c3f9dbf8 scored 0 {"service":"situational-awareness-backend","timestamp":"2026-03-25 21:58:44"}
+[32minfo[39m: Job 248 completed in queue news-scoring {"result":{"articleId":"70de7520-56b0-4771-87da-6e34c3f9dbf8","score":0,"timestamp":"2026-03-25T20:58:44.590Z"},"service":"situational-awareness-backend","timestamp":"2026-03-25 21:58:44"}
+[32minfo[39m: news-scoring: article 34b58c67-729d-42a8-87b6-5ab69d87be29 scored 1 {"service":"situational-awareness-backend","timestamp":"2026-03-25 21:58:50"}
+[32minfo[39m: Job 249 completed in queue news-scoring {"result":{"articleId":"34b58c67-729d-42a8-87b6-5ab69d87be29","score":1,"timestamp":"2026-03-25T20:58:50.497Z"},"service":"situational-awareness-backend","timestamp":"2026-03-25 21:58:50"}
+[32minfo[39m: Processing UCDP GED sync job {"service":"situational-awareness-backend","startDate":"2025-12-25","timestamp":"2026-03-25 21:58:58"}
+[32minfo[39m: Fetched 0 UCDP GED events (of 0) {"service":"situational-awareness-backend","timestamp":"2026-03-25 21:58:58"}
+[33mwarn[39m: UCDP GED sync: no events returned {"service":"situational-awareness-backend","startDate":"2025-12-25","timestamp":"2026-03-25 21:58:58"}
+[32minfo[39m: Job 42 completed in queue ucdp-ged {"result":{"processed":0,"timestamp":"2026-03-25T20:58:58.613Z"},"service":"situational-awareness-backend","timestamp":"2026-03-25 21:58:58"}
+[32minfo[39m: news-scoring: article 347269f5-83e5-4b8f-9592-3b0d5e812e59 scored 0 {"service":"situational-awareness-backend","timestamp":"2026-03-25 21:59:04"}
+[32minfo[39m: Job 250 completed in queue news-scoring {"result":{"articleId":"347269f5-83e5-4b8f-9592-3b0d5e812e59","score":0,"timestamp":"2026-03-25T20:59:04.650Z"},"service":"situational-awareness-backend","timestamp":"2026-03-25 21:59:04"}
+[0mGET /api/v1/news/headlines?level=all&limit=50 [32m200[0m 13.977 ms - -[0m
+[32minfo[39m: Processing flight sync job {"service":"situational-awareness-backend","timestamp":"2026-03-25 22:00:00"}
+[32minfo[39m: Processing conflict sync job {"service":"situational-awareness-backend","timestamp":"2026-03-25 22:00:00"}
+[31merror[39m: Job repeat:4670a80b4b26f6f2ded7d464a1b743c8:1774472400000 failed in queue news-ingestion {"error":"Cannot find module 'rss-parser'\nRequire stack:\n- /Users/henrik/vsc_projects/newsflash/backend/src/services/newsService.js\n- /Users/henrik/vsc_projects/newsflash/backend/src/jobs/queues.js\n- /Users/henrik/vsc_projects/newsflash/backend/src/routes/v1/ingest.js\n- /Users/henrik/vsc_projects/newsflash/backend/src/routes/v1/index.js\n- /Users/henrik/vsc_projects/newsflash/backend/src/app.js\n- /Users/henrik/vsc_projects/newsflash/backend/src/server.js","service":"situational-awareness-backend","timestamp":"2026-03-25 22:00:00"}
+[32minfo[39m: ACLED token obtained {"grant":"password","service":"situational-awareness-backend","timestamp":"2026-03-25 22:00:00"}
+[31merror[39m: ACLED HTTP error {"body":"{\"message\":\"Access denied\"}","params":{"event_date":"2026-03-24","event_date_where":">=","limit":1000},"service":"situational-awareness-backend","status":403,"timestamp":"2026-03-25 22:00:00","url":"https://acleddata.com/api/acled/read"}
+[31merror[39m: Error fetching conflicts from ACLED {"error":"Request failed with status code 403","service":"situational-awareness-backend","timestamp":"2026-03-25 22:00:00"}
+[33mwarn[39m: Conflict sync: no conflicts returned from ACLED {"service":"situational-awareness-backend","timestamp":"2026-03-25 22:00:00"}
+[32minfo[39m: Job repeat:2139229d6409838fcdaf57f662735edc:1774472400000 completed in queue acled-conflicts {"result":{"processed":0,"timestamp":"2026-03-25T21:00:00.939Z"},"service":"situational-awareness-backend","timestamp":"2026-03-25 22:00:00"}
+[32minfo[39m: Fetched 100 active flights from AviationStack {"service":"situational-awareness-backend","timestamp":"2026-03-25 22:00:01"}
+[32minfo[39m: Flight sync complete: 100 flights fetched {"service":"situational-awareness-backend","timestamp":"2026-03-25 22:00:01"}
+[32minfo[39m: Job repeat:0e33f1bb2873999aa9b55fa78e5c99c5:1774472400000 completed in queue aviation-flights {"result":{"processed":100,"timestamp":"2026-03-25T21:00:01.853Z"},"service":"situational-awareness-backend","timestamp":"2026-03-25 22:00:01"}
+[0mGET /api/v1/news/headlines?level=all&limit=50 [32m200[0m 3.672 ms - -[0m
+[0mGET /api/v1/news/headlines?level=all&limit=50 [32m200[0m 3.414 ms - -[0m
+[0mGET /api/v1/news/headlines?level=all&limit=50 [36m304[0m 3.841 ms - -[0m
+[0mGET /api/v1/news/headlines?level=all&limit=50 [36m304[0m 2.633 ms - -[0m
+[0mGET /api/v1/news/headlines?level=all&limit=50 [36m304[0m 1.869 ms - -[0m
+[0mGET /api/v1/correlations?limit=100 [33m404[0m 0.415 ms - 90[0m
+[0mGET /api/v1/energy/facilities?limit=100 [36m304[0m 1.577 ms - -[0m
+[0mGET /api/v1/conflicts?limit=100 [36m304[0m 1.500 ms - -[0m
+[0mGET /api/v1/conflicts?limit=1000 [36m304[0m 1.518 ms - -[0m
+[0mGET /api/v1/energy/facilities?limit=1000 [36m304[0m 1.453 ms - -[0m
+[0mGET /api/v1/correlations?limit=100 [33m404[0m 0.103 ms - 90[0m
+[0mGET /api/v1/conflicts/cast? [36m304[0m 2.206 ms - -[0m
+[0mGET /api/v1/conflicts/ucdp-events? [36m304[0m 17.717 ms - -[0m
+[0mGET /api/v1/conflicts/ucdp-context [36m304[0m 17.636 ms - -[0m
+[0mGET /api/v1/energy/facilities?limit=100 [36m304[0m 16.381 ms - -[0m
+[0mGET /api/v1/conflicts?limit=100 [36m304[0m 15.711 ms - -[0m
+[0mGET /api/v1/conflicts?limit=1000 [36m304[0m 1.835 ms - -[0m
+[0mGET /api/v1/energy/facilities?limit=1000 [36m304[0m 1.671 ms - -[0m
+[0mGET /api/v1/conflicts/cast? [36m304[0m 1.590 ms - -[0m
+[0mGET /api/v1/conflicts/ucdp-events? [36m304[0m 12.410 ms - -[0m
+[0mGET /api/v1/conflicts/ucdp-context [36m304[0m 10.687 ms - -[0m
+[0mGET /api/v1/flights/active?limit=500 [36m304[0m 34.673 ms - -[0m
+[0mGET /api/v1/flights/active?limit=100 [36m304[0m 36.052 ms - -[0m
+[0mGET /api/v1/flights/active?limit=500 [36m304[0m 0.924 ms - -[0m
+[0mGET /api/v1/flights/active?limit=100 [36m304[0m 0.569 ms - -[0m
+[0mGET /api/v1/correlations?limit=100 [33m404[0m 0.109 ms - 90[0m
+[0mGET /api/v1/conflicts?limit=1000 [36m304[0m 1.369 ms - -[0m
+[0mGET /api/v1/energy/facilities?limit=1000 [36m304[0m 1.321 ms - -[0m
+[0mGET /api/v1/flights/active?limit=500 [36m304[0m 0.855 ms - -[0m
+[0mGET /api/v1/correlations?limit=100 [33m404[0m 0.049 ms - 90[0m
+[0mGET /api/v1/conflicts/cast? [36m304[0m 1.662 ms - -[0m
+[0mGET /api/v1/conflicts/ucdp-events? [36m304[0m 15.719 ms - -[0m
+[0mGET /api/v1/conflicts/ucdp-context [36m304[0m 15.478 ms - -[0m
+[0mGET /api/v1/conflicts?limit=1000 [36m304[0m 14.975 ms - -[0m
+[0mGET /api/v1/energy/facilities?limit=1000 [36m304[0m 14.902 ms - -[0m
+[0mGET /api/v1/flights/active?limit=500 [36m304[0m 14.293 ms - -[0m
+[0mGET /api/v1/conflicts/cast? [36m304[0m 13.743 ms - -[0m
+[0mGET /api/v1/conflicts/ucdp-events? [36m304[0m 14.453 ms - -[0m
+[0mGET /api/v1/conflicts/ucdp-context [36m304[0m 14.446 ms - -[0m
+[0mGET /api/v1/correlations?limit=100 [33m404[0m 0.193 ms - 90[0m
+[0mGET /api/v1/conflicts?limit=1000 [36m304[0m 1.569 ms - -[0m
+[0mGET /api/v1/correlations?limit=100 [33m404[0m 0.139 ms - 90[0m
+[0mGET /api/v1/energy/facilities?limit=1000 [36m304[0m 1.781 ms - -[0m
+[0mGET /api/v1/flights/active?limit=500 [36m304[0m 1.494 ms - -[0m
+[0mGET /api/v1/conflicts?limit=1000 [36m304[0m 0.895 ms - -[0m
+[0mGET /api/v1/energy/facilities?limit=1000 [36m304[0m 0.705 ms - -[0m
+[0mGET /api/v1/flights/active?limit=500 [36m304[0m 0.640 ms - -[0m
+[0mGET /api/v1/correlations?limit=100 [33m404[0m 0.131 ms - 90[0m
+[0mGET /api/v1/conflicts?limit=1000 [36m304[0m 1.480 ms - -[0m
+[0mGET /api/v1/correlations?limit=100 [33m404[0m 0.056 ms - 90[0m
+[0mGET /api/v1/energy/facilities?limit=1000 [36m304[0m 1.099 ms - -[0m
+[0mGET /api/v1/flights/active?limit=500 [36m304[0m 1.164 ms - -[0m
+[0mGET /api/v1/conflicts?limit=1000 [36m304[0m 1.409 ms - -[0m
+[0mGET /api/v1/energy/facilities?limit=1000 [36m304[0m 0.714 ms - -[0m
+[0mGET /api/v1/flights/active?limit=500 [36m304[0m 0.616 ms - -[0m
+[0mGET /api/v1/conflicts?limit=100 [36m304[0m 0.942 ms - -[0m
+[0mGET /api/v1/energy/facilities?limit=100 [36m304[0m 0.874 ms - -[0m
+[0mGET /api/v1/flights/active?limit=100 [36m304[0m 0.833 ms - -[0m
+[0mGET /api/v1/conflicts?limit=100 [36m304[0m 0.665 ms - -[0m
+[0mGET /api/v1/energy/facilities?limit=100 [36m304[0m 0.475 ms - -[0m
+[0mGET /api/v1/flights/active?limit=100 [36m304[0m 0.571 ms - -[0m
+[0mGET /api/v1/news/headlines?level=all&limit=50 [36m304[0m 6.569 ms - -[0m
+[0mGET /api/v1/news/headlines?level=all&limit=50 [36m304[0m 1.436 ms - -[0m
+[0mGET /api/v1/news/headlines?level=all&limit=50 [36m304[0m 2.433 ms - -[0m
+[0mGET /api/v1/news/headlines?level=all&limit=50 [36m304[0m 1.174 ms - -[0m
+[0mGET /api/v1/news/headlines?level=all&limit=50 [36m304[0m 12.170 ms - -[0m
+[0mGET /api/v1/news/headlines?level=all&limit=50 [36m304[0m 2.096 ms - -[0m
+[0mGET /api/v1/news/headlines?level=all&limit=50 [36m304[0m 13.028 ms - -[0m
+[0mGET /api/v1/news/headlines?level=all&limit=50 [36m304[0m 2.408 ms - -[0m
+[0mGET /api/v1/news/headlines?level=all&limit=50 [36m304[0m 15.056 ms - -[0m
+[32minfo[39m: SIGINT received. Starting graceful shutdown... {"service":"situational-awareness-backend","timestamp":"2026-03-25 22:06:07"}
+[31merror[39m: Error closing database pool: Cannot read properties of undefined (reading 'end') {"service":"situational-awareness-backend","stack":"TypeError: Cannot read properties of undefined (reading 'end')\n    at gracefulShutdown (/Users/henrik/vsc_projects/newsflash/backend/src/server.js:50:20)\n    at process.<anonymous> (/Users/henrik/vsc_projects/newsflash/backend/src/server.js:68:32)\n    at process.emit (node:events:508:20)","timestamp":"2026-03-25 22:06:07"}
+[32minfo[39m: HTTP server closed {"service":"situational-awareness-backend","timestamp":"2026-03-25 22:06:07"}
+[32minfo[39m: Redis connection closed {"service":"situational-awareness-backend","timestamp":"2026-03-25 22:06:07"}

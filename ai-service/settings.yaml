@@ -35,9 +35,9 @@ cost:
 
 tiingo:
   # Max articles to fetch per Tiingo query
-  news_limit: 10
+  news_limit: 50
   # Max tickers to send in a single request
-  max_tickers: 10
+  max_tickers: 20
 
   general_news:
     enabled: true                    # override: TIINGO_NEWS_ENABLED=false
@@ -54,3 +54,5 @@ tiingo:
       - natural-gas
       - government
       - politics
+      - economy
+      - finance 
