@@ -7,6 +7,7 @@ import logging
 import os
 
 import httpx
+from openai import OpenAI
 
 from services.tiingo import fetch_tiingo_news
 
@@ -42,7 +43,6 @@ def _classify_category(
     if not openai_api_key:
         return None
     try:
-        from openai import OpenAI
         client = OpenAI(api_key=openai_api_key)
         tag_list = ", ".join(taxonomy)
         prompt = (

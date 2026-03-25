@@ -138,7 +138,7 @@ def test_classify_category_llm_success():
     mock_client.chat.completions.create.return_value = mock_resp
 
     with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-        with patch("openai.OpenAI", return_value=mock_client):
+        with patch("services.tiingo_ingest.OpenAI", return_value=mock_client):
             result = _classify_category(
                 "NATO summit", "Alliance leaders meet.", ["nato", "diplomacy"], ["energy", "geopolitics"]
             )
@@ -157,7 +157,7 @@ def test_classify_category_llm_out_of_taxonomy():
     mock_client.chat.completions.create.return_value = mock_resp
 
     with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-        with patch("openai.OpenAI", return_value=mock_client):
+        with patch("services.tiingo_ingest.OpenAI", return_value=mock_client):
             result = _classify_category(
                 "Some article", "Some description.", ["xyz"], ["energy", "geopolitics"]
             )
@@ -173,12 +173,26 @@ def test_classify_category_llm_exception():
     mock_client.chat.completions.create.side_effect = Exception("quota exceeded")
 
     with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-        with patch("openai.OpenAI", return_value=mock_client):
+        with patch("services.tiingo_ingest.OpenAI", return_value=mock_client):
             result = _classify_category(
                 "Some article", "Some description.", ["xyz"], ["energy", "geopolitics"]
             )
 
     assert result is None
+
+
+def test_classify_category_no_api_key_returns_none():
+    """OPENAI_API_KEY absent → intersection missed, returns None without LLM call."""
+    from services.tiingo_ingest import _classify_category
+
+    with patch("os.getenv", return_value=None):
+        with patch("services.tiingo_ingest.OpenAI") as MockOpenAI:
+            result = _classify_category(
+                "NATO summit", "Alliance leaders meet.", ["nato"], ["energy", "geopolitics"]
+            )
+
+    assert result is None
+    MockOpenAI.assert_not_called()
 
 
 def test_classify_category_empty_tags():
@@ -191,7 +205,7 @@ def test_classify_category_empty_tags():
     mock_client.chat.completions.create.return_value = mock_resp
 
     with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-        with patch("openai.OpenAI", return_value=mock_client):
+        with patch("services.tiingo_ingest.OpenAI", return_value=mock_client):
             result = _classify_category(
                 "Oil rises", "Crude surges.", [], ["energy", "geopolitics"]
             )
