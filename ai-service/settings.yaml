@@ -38,3 +38,19 @@ tiingo:
   news_limit: 10
   # Max tickers to send in a single request
   max_tickers: 10
+
+  general_news:
+    enabled: true                    # override: TIINGO_NEWS_ENABLED=false
+    poll_interval_minutes: 15        # override: TIINGO_NEWS_POLL_INTERVAL=N
+    limit: 50                        # articles per poll
+    tags:
+      - geopolitics
+      - conflict
+      - war
+      - energy
+      - sanctions
+      - defense
+      - oil
+      - natural-gas
+      - government
+      - politics

@@ -78,6 +78,34 @@ class _Cost:
         return float(os.getenv("MONTHLY_BUDGET_USD") or get("cost", "monthly_budget_usd"))
 
 
+class _TiingoGeneralNews:
+    @property
+    def enabled(self) -> bool:
+        v = os.getenv("TIINGO_NEWS_ENABLED")
+        if v is not None:
+            return v.lower() not in ("false", "0", "no")
+        return bool(get("tiingo", "general_news", "enabled"))
+
+    @property
+    def poll_interval_minutes(self) -> int:
+        return int(
+            os.getenv("TIINGO_NEWS_POLL_INTERVAL")
+            or get("tiingo", "general_news", "poll_interval_minutes")
+            or 15
+        )
+
+    @property
+    def limit(self) -> int:
+        return int(get("tiingo", "general_news", "limit") or 50)
+
+    @property
+    def tags(self) -> list:
+        raw = os.getenv("TIINGO_NEWS_TAGS")
+        if raw:
+            return [t.strip() for t in raw.split(",")]
+        return get("tiingo", "general_news", "tags") or []
+
+
 class _Tiingo:
     @property
     def news_limit(self) -> int:
@@ -86,6 +114,10 @@ class _Tiingo:
     @property
     def max_tickers(self) -> int:
         return int(os.getenv("TIINGO_MAX_TICKERS") or get("tiingo", "max_tickers"))
+
+    @property
+    def general_news(self) -> _TiingoGeneralNews:
+        return _TiingoGeneralNews()
 
 
 tiingo = _Tiingo()
