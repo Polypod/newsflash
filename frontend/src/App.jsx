@@ -2,6 +2,8 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { DataProvider } from './context/DataContext';
 import { FilterProvider } from './context/FilterContext';
+import { NewsflashProvider } from './context/NewsflashContext';
+import NewsflashToast from './components/News/NewsflashToast';
 
 // Lazy load pages for better performance
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -11,6 +13,7 @@ const Flights = lazy(() => import('./pages/Flights'));
 const Analysis = lazy(() => import('./pages/Analysis'));
 const Settings = lazy(() => import('./pages/Settings'));
 const Login = lazy(() => import('./pages/Login'));
+const News = lazy(() => import('./pages/News'));
 
 // Loading component
 function LoadingSpinner() {
@@ -79,23 +82,27 @@ class ErrorBoundary extends React.Component {
 function App() {
   return (
     <ErrorBoundary>
-      <DataProvider>
-        <FilterProvider>
-          <Router>
-            <Suspense fallback={<LoadingSpinner />}>
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/conflicts" element={<Conflicts />} />
-                <Route path="/energy" element={<Energy />} />
-                <Route path="/flights" element={<Flights />} />
-                <Route path="/analysis" element={<Analysis />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/login" element={<Login />} />
-              </Routes>
-            </Suspense>
-          </Router>
-        </FilterProvider>
-      </DataProvider>
+      <NewsflashProvider>
+        <DataProvider>
+          <FilterProvider>
+            <Router>
+              <Suspense fallback={<LoadingSpinner />}>
+                <NewsflashToast />
+                <Routes>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/conflicts" element={<Conflicts />} />
+                  <Route path="/energy" element={<Energy />} />
+                  <Route path="/flights" element={<Flights />} />
+                  <Route path="/analysis" element={<Analysis />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/news" element={<News />} />
+                </Routes>
+              </Suspense>
+            </Router>
+          </FilterProvider>
+        </DataProvider>
+      </NewsflashProvider>
     </ErrorBoundary>
   );
 }

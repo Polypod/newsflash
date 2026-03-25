@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { NewsflashContext } from '../../context/NewsflashContext';
 
 export default function Header() {
   const location = useLocation();
+  const { toasts } = useContext(NewsflashContext);
 
   const navItems = [
     { path: '/', label: 'Dashboard' },
@@ -52,6 +54,19 @@ export default function Header() {
                 {item.label}
               </Link>
             ))}
+            <Link
+              to="/news"
+              className={`relative inline-flex items-center px-1 pt-1 text-sm font-medium border-b-2 ${
+                location.pathname === '/news'
+                  ? 'border-blue-500 text-gray-900'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              News
+              {toasts.length > 0 && (
+                <span className="absolute -top-1 -right-2 h-2 w-2 rounded-full bg-red-500" />
+              )}
+            </Link>
           </nav>
 
           <div className="flex items-center space-x-4">
