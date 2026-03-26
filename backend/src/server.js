@@ -46,8 +46,8 @@ async function startServer() {
 
       // Close database connections
       try {
-        const { pool } = require('./config/database');
-        await pool.end();
+        const { getDbPool } = require('./config/database');
+        await getDbPool().end();
         logger.info('Database pool closed');
       } catch (err) {
         logger.error('Error closing database pool:', err);

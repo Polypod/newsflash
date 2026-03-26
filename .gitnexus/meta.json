@@ -1,12 +1,12 @@
 {
   "repoPath": "/Users/henrik/vsc_projects/newsflash",
-  "lastCommit": "48f042c42c2812b2424c8bd4612f468d97fbdf4e",
-  "indexedAt": "2026-03-24T07:29:50.338Z",
+  "lastCommit": "dfe93871d593adec560f98a526cb2f1804d0db6a",
+  "indexedAt": "2026-03-26T05:58:54.722Z",
   "stats": {
-    "files": 109,
-    "nodes": 477,
-    "edges": 896,
-    "communities": 56,
-    "processes": 21
+    "files": 144,
+    "nodes": 621,
+    "edges": 1243,
+    "communities": 74,
+    "processes": 37
   }
 }
