@@ -34,11 +34,11 @@ def _classify_category(
     if not taxonomy:
         return None
 
-    taxonomy_set = {t.lower() for t in taxonomy}
+    taxonomy_set = {t.lower() for t in taxonomy if isinstance(t, str)}
 
     # Step 1: intersection — canonical form is always lowercase
     for tag in article_tags:
-        if tag.lower() in taxonomy_set:
+        if isinstance(tag, str) and tag.lower() in taxonomy_set:
             return tag.lower()
 
     # Step 2: LLM fallback

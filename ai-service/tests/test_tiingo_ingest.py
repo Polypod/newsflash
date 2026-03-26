@@ -229,3 +229,17 @@ def test_classify_category_empty_taxonomy_returns_none():
 
     assert result is None
     MockOpenAI.assert_not_called()
+
+
+def test_classify_category_non_string_tag_skipped():
+    """Non-string elements in article_tags are skipped; subsequent string match works."""
+    from services.tiingo_ingest import _classify_category
+
+    with patch.dict("os.environ", {}, clear=True):
+        with patch("services.tiingo_ingest.OpenAI") as MockOpenAI:
+            result = _classify_category(
+                "Oil rises", "Crude surges.", [None, "energy"], ["energy", "geopolitics"]
+            )
+
+    assert result == "energy"
+    MockOpenAI.assert_not_called()
