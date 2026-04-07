@@ -31,7 +31,7 @@
     "eslint": "^8.55.0",
     "postcss": "^8.4.32",
     "prettier": "^3.1.1",
-    "vite": "^5.0.8",
+    "vite": "^8.0.5",
     "vitest": "^1.1.0"
   },
   "engines": {
